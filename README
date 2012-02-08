@@ -1,0 +1,2 @@
+Danbooru-daemon is a daemon to download images automatically from danbooru-like
+sites and optionally tag them with Nepomuk, licensed under Apache License 2.0.
