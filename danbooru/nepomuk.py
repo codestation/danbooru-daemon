@@ -58,7 +58,6 @@ class NepomukBus(object):
         self.setProperty(res, 'author', post['author'])
         self.setProperty(res, 'postId', post['id'])
         self.setProperty(res, 'rating', post['rating'])
-        self.removeProperties(res, ['source', 'score', 'author', 'postId', 'rating'])
             
     def setRating(self, file, rating):
         if rating not in range(0, 11): return
