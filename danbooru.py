@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-c', '--config', dest='config', default='config.cfg',
             help='use the indicated config file')
-    parser.add_argument('-t', '--tags', dest='tags', nargs=1,
+    parser.add_argument('-t', '--tags', dest='tags',
             help='list of tags to use in search (join multiple "+")')
     parser.add_argument('-a', '--action', dest='action', required=True,
             help='set the action to perform')
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
     
-    def getLastId():
+    def getLastId(tags):
         if args.before_id:
             return int(args.before_id)
         else:
@@ -72,9 +72,14 @@ if __name__ == '__main__':
     db = Database(cfg.dbname)
     
     if args.action == 'update':
-        last_id = getLastId()
+        if not args.tags:
+            print('No tags specified. Aborting.')
+            sys.exit(1)
+
+        last_id = getLastId(args.tags)
+        print('Last post id: %i' % last_id)
         while not abort:
-            post_list = board.getPostsBefore(last_id, tags, limit)
+            post_list = board.getPostsBefore(last_id, args.tags, limit)
             if post_list:
                 if db.addPosts(post_list) == 0:
                     print('No more posts left')
@@ -82,6 +87,7 @@ if __name__ == '__main__':
                 last_id = post_list[-1]['id']
                 print('Next fetch id: %i' % last_id)
             else:
+                print('No posts returned')
                 break
             
     elif args.action == 'tags':
