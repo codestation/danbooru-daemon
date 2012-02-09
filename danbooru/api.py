@@ -30,17 +30,17 @@ class Api(object):
 
     _delta_time = 0
 
-    def _wait(self):
-        self._delta_time = time() - self._delta_time
-        if self._delta_time < 1.2:
-            sleep(1 - self._delta_time)
-
     def __init__(self, host, username, password, salt, dbname):
         self.host = host
         self.username = username
         self.password = password
         self.salt = salt
         self.dbname = dbname
+        
+    def _wait(self):
+        self._delta_time = time() - self._delta_time
+        if self._delta_time < 1.2:
+            sleep(1 - self._delta_time)
 
     def _loginData(self):
         sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
