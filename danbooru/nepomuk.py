@@ -25,7 +25,7 @@ class NepomukBus(object):
 
     def __init__(self):
         if Nepomuk.ResourceManager.instance().init() != 0:
-            raise Exception('Error initializing nepomuk')
+            raise Exception('Error initializing Nepomuk')
         
     def removeProperties(self, res, ontologies):
         for ontology in ontologies:
@@ -41,21 +41,25 @@ class NepomukBus(object):
         else:
             return res
     
-    def updateTags(self, filename, post):
+    def updateTags(self, filename, post, skip=False):
         res = self.getResource(filename)
+        
+        if skip and self.ndbu_uri % 'postId' in res.allProperties():
+            return
+        
         self.removeTags(filename)
         for name in post['tags']:
             tag = Nepomuk.Tag(name)
             tag.setLabel(name)
             res.addTag(tag)
         if post['source']:     
-            self.setProperty(res, 'source', KUrl(post['source']))            
+            self.setProperty(res, 'source', KUrl(post['source']))    
         else:
             self.removeProperties(res, ['source'])
         self.setProperty(res, 'score', post['score'])
         self.setProperty(res, 'author', post['author'])
+        self.setProperty(res, 'postRating', post['rating'])
         self.setProperty(res, 'postId', post['id'])
-        self.setProperty(res, 'rating', post['rating'])
             
     def setRating(self, file, rating):
         if rating not in range(0, 11): return
@@ -68,8 +72,6 @@ class NepomukBus(object):
             
     def getTags(self, file):
         resource = self.getResource(file)
-        for i in resource.tags():
-            print(i.label())
         return [x.label() for x in resource.tags()]
         
     def removeTags(self, file):        

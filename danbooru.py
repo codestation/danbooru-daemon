@@ -27,19 +27,20 @@ from danbooru.downloader import Downloader
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-c', '--config', dest='config', action='store',
-            required=True, help='Use the indicated config file')
-    parser.add_argument('-t', '--tags', dest='tags', action='store', nargs=1,
-            help='List of tags to use in search (join multiple tags with "+")')
+    parser.add_argument('-c', '--config', dest='config', default='config.cfg',
+            help='use the indicated config file')
+    parser.add_argument('-t', '--tags', dest='tags', nargs=1,
+            help='list of tags to use in search (join multiple "+")')
     parser.add_argument('-a', '--action', dest='action', required=True,
-            help='Set the action to perform')
-    parser.add_argument('-b', '--before-id', dest='before_id', action='store', 
-            help='Search using this id as starting point')
+            help='set the action to perform')
+    parser.add_argument('-b', '--before-id', dest='before_id', 
+            help='search using this id as starting point')
     
     args = parser.parse_args()
     
-    cfg = Settings('config.cfg')
-    if not cfg.load('danbooru', ['host', 'username', 'password', 'salt', 'dbname', 'limit', 'download_path', 'extra_path']):
+    cfg = Settings(args.config)
+    if not cfg.load('danbooru',['host', 'username', 'password', 'salt', 
+                                'dbname', 'limit', 'download_path', 'extra_path']):
         sys.exit(1)
 
     board = Api(cfg.host, cfg.username, cfg.password, cfg.salt, cfg.dbname)
@@ -103,17 +104,20 @@ if __name__ == '__main__':
             dl.downloadQueue(rows, False)
             offset += 100
             
-    elif args.action == 'nepomuk':        
+    elif args.action == 'nepomuk':  
         from danbooru.nepomuk import NepomukBus
         nk = NepomukBus()
+        file_count = 1
         for name in os.listdir(cfg.download_path):
             full = os.path.join(cfg.download_path, name)
             if isfile(full):
-                print(name)
+                print('(%i) Processing %s' % (file_count, name))
                 post = db.getPost(name)
-                res = nk.getResource(full)
-                nk.updateTags(res, post)
-                break
-                #nk.setRating(res)
-        
+                if post:
+                    res = nk.getResource(full)
+                    nk.updateTags(res, post, skip=True)
+                    if abort: break
+                    file_count += 1
+                else:
+                    print('%s isn\'t in database' % name)
         

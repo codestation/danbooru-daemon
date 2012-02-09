@@ -100,11 +100,12 @@ class Database(object):
         self.conn.row_factory = dict_factory
         row = self.conn.execute('SELECT * from post WHERE md5 = ?', [os.path.splitext(file)[0]])
         data = row.fetchone()
-        self.conn.row_factory = None
-        row = self.conn.execute('SELECT tag_name FROM post_tag WHERE post_id =:id', data)
-        data['tags'] = [x[0] for x in row]
-        data['rating'] = self.ratings[data['rating']]
-        return data
+        if data:
+            self.conn.row_factory = None
+            row = self.conn.execute('SELECT tag_name FROM post_tag WHERE post_id =:id', data)
+            data['tags'] = [x[0] for x in row]
+            data['rating'] = self.ratings[data['rating']]
+            return data
                 
     def getFiles(self, limit, offset):
         rows = self.conn.execute('SELECT file_url, md5 FROM post ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))

@@ -21,6 +21,7 @@ from time import sleep
 from os.path import basename, splitext
 from urllib.parse import urlsplit
 from urllib.request import urlopen
+from urllib.error import URLError, HTTPError
 
 class Downloader(object):
     
@@ -36,41 +37,50 @@ class Downloader(object):
 
     def downloadQueue(self, dl_list, check=True):
         for dl in dl_list:
-            if self.abort: break
-            file_extra = self.extra + '/' + basename(urlsplit(dl['file_url'])[2])            
-            filename = self.path + '/' + basename(urlsplit(dl['file_url'])[2])
-            try:
-                ext = False
+            for retry in range(0, 4):
+                if self.abort: break
+                file_extra = self.extra + '/' + basename(urlsplit(dl['file_url'])[2])            
+                filename = self.path + '/' + basename(urlsplit(dl['file_url'])[2])
                 try:
-                    f = open(file_extra, 'rb')
-                    ext = True
+                    ext = False
+                    try:
+                        f = open(file_extra, 'rb')
+                        ext = True
+                    except IOError:
+                        f = open(filename, 'rb')
+                    if check:
+                        md5_hash = hashlib.md5()
+                        while True:
+                            d = f.read(128)
+                            if not d: break
+                            md5_hash.update(d)
+                        f.close()
+                        md5 = md5_hash.hexdigest()
+                    else:
+                        print('Skipping md5 hash calculation')
+                        md5 = basename(splitext(filename)[0])
+                    if md5 == dl['md5']:
+                        print('%s already exists, skipping' % dl['file_url'])
+                        if ext:
+                            print('Moving %s to %s' % (file_extra, filename))
+                            shutil.move(file_extra, filename)
+                        continue
                 except IOError:
-                    f = open(filename, 'rb')
-                if check:
-                    md5_hash = hashlib.md5()
-                    while True:
-                        d = f.read(128)
-                        if not d: break
-                        md5_hash.update(d)
-                    f.close()
-                    md5 = md5_hash.hexdigest()
-                else:
-                    print('Skipping md5 hash calculation')
-                    md5 = basename(splitext(filename)[0])
-                if md5 == dl['md5']:
-                    print('%s already exists, skipping' % dl['file_url'])
-                    if ext:
-                        print('Moving %s to %s' % (file_extra, filename))
-                        shutil.move(file_extra, filename)
-                    continue
-            except IOError:
-                pass
-            
-            local_file = open(filename, 'wb')
-            remote_file = urlopen(dl['file_url'])
-            shutil.copyfileobj(remote_file, local_file)
-            remote_file.close()
-            local_file.close()
-            self.total += 1
-            print('(%i) %s [OK]' % (self.total, dl['file_url']))
-            sleep(1)
+                    pass
+                #TODO: handle file open error
+                local_file = open(filename, 'wb')
+                try:
+                    remote_file = urlopen(dl['file_url'])
+                    shutil.copyfileobj(remote_file, local_file)
+                    remote_file.close()                
+                    local_file.close()
+                    self.total += 1
+                    print('(%i) %s [OK]' % (self.total, dl['file_url']))
+                    sleep(1)
+                    break
+                except URLError as e:
+                    print('\n>>> Error %s' % e.reason)
+                except HTTPError as e:
+                    print('\n>>> Error %i: %s' % (e.code, e.msg))
+                print('Retrying (%i) in 3 seconds...', retry)
+                sleep(3)
