@@ -56,19 +56,22 @@ class Downloader(object):
         if hash_from_file and isfile(filename):
             md5 = basename(splitext(filename)[0])
         else:
-            md5 = self._calculateMD5(file_extra)            
+            md5 = self._calculateMD5(file_extra)
             using_extra = True
          
         if not md5:         
             md5 = self._calculateMD5(filename)
 
-        if md5 and md5 == file_md5:            
-            if using_extra:
-                print('Moving %s to %s' % (file_extra, filename))
-                shutil.move(file_extra, filename)
+        if md5:
+            if md5 == file_md5:
+                if using_extra:
+                    print('Moving %s to %s' % (file_extra, filename))
+                    shutil.move(file_extra, filename)
+                else:
+                    print('%s already exists, skipping download' % filename)
+                return True
             else:
-                print('%s already exists, skipping download' % filename)
-            return True
+                print('md5 mismatch for %s' % base)
         return False
                     
     def downloadQueue(self, dl_list):
