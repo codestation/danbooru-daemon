@@ -55,12 +55,14 @@ class Downloader(object):
             base = basename(urlsplit(dl['file_url'])[2])            
             filename = self.path + '/' + base
             if nohash and isfile(filename):
-                print("%s already exists, skipping" % filename)
+                print("(%i) %s already exists, skipping" % (self.total, filename))
+                self.total += 1
                 continue
             md5 = self._calculateMD5(filename)
             if md5:
                 if md5 == dl['md5']:
-                    print("%s already exists, skipping" % filename)
+                    print("(%i) %s already exists, skipping" % (self.total, filename))
+                    self.total += 1
                     continue
                 else:
                     print("%s md5sum doesn't match, re-downloading")
