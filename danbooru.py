@@ -40,7 +40,7 @@ if __name__ == '__main__':
     
     cfg = Settings(args.config)
     if not cfg.load('danbooru',['host', 'username', 'password', 'salt', 
-                                'dbname', 'limit', 'download_path', 'extra_path']):
+                                'dbname', 'limit', 'download_path']):
         sys.exit(1)
 
     board = Api(cfg.host, cfg.username, cfg.password, cfg.salt, cfg.dbname)
