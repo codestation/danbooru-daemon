@@ -19,7 +19,7 @@ import os
 import sys
 import signal
 import argparse
-from genericpath import isfile
+from genericpath import isfile, isdir
 from danbooru.api import Api
 from danbooru.database import Database
 from danbooru.settings import Settings
@@ -114,16 +114,25 @@ if __name__ == '__main__':
         from danbooru.nepomuk import NepomukBus
         nk = NepomukBus()
         file_count = 1
-        for name in os.listdir(cfg.download_path):
-            full = os.path.join(cfg.download_path, name)
-            if isfile(full):
-                print('(%i) Processing %s' % (file_count, name))
-                post = db.getPost(name)
-                if post:
-                    res = nk.getResource(full)
-                    nk.updateTags(res, post, skip=True)
-                    if abort: break
-                    file_count += 1
-                else:
-                    print('%s isn\'t in database' % name)
+        
+        def process_dir(directory):  
+            global file_count
+            global abort
+                      
+            for name in os.listdir(directory):                
+                if abort: break
+                full_path = os.path.join(directory, name)
+                if isdir(full_path):
+                    process_dir(full_path)
+                elif isfile(full_path):
+                    print('(%i) Processing %s' % (file_count, name))
+                    post = db.getPost(name)
+                    if post:
+                        res = nk.getResource(full_path)
+                        nk.updateTags(res, post, skip=True)
+                        file_count += 1
+                    else:
+                        print('%s isn\'t in database' % name)
+
+        process_dir(cfg.download_path)
         

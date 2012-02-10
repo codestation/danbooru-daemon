@@ -18,7 +18,7 @@
 import shutil
 import hashlib
 from time import sleep
-from os.path import basename, splitext, isfile
+from os.path import basename, splitext, isfile, join
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
@@ -49,11 +49,11 @@ class Downloader(object):
                     
     def downloadQueue(self, dl_list, nohash=False):
         for dl in dl_list:
-            if self.abort:
-                break
+            if self.abort: break
             
-            base = basename(urlsplit(dl['file_url'])[2])            
-            filename = self.path + '/' + base
+            base = basename(urlsplit(dl['file_url'])[2])
+            subdir = base[0]
+            filename = join(self.path, subdir, base)
             if nohash and isfile(filename):
                 print("(%i) %s already exists, skipping" % (self.total, filename))
                 self.total += 1
