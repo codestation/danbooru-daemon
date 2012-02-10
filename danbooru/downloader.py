@@ -28,9 +28,8 @@ class Downloader(object):
     total = 0
     abort = False
 
-    def __init__(self, path, extra):
+    def __init__(self, path):
         self.path = path
-        self.extra = extra
         
     def stopDownload(self):
         self.abort = True

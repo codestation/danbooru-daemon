@@ -49,7 +49,7 @@ if __name__ == '__main__':
     tags = sys.argv[2]
     abort = False    
     
-    dl = Downloader(cfg.download_path, cfg.extra_path)
+    dl = Downloader(cfg.download_path)
     
     def signal_handler(signal, frame):
         global abort
