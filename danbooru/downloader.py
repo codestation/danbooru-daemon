@@ -47,42 +47,25 @@ class Downloader(object):
             return md5_hash.hexdigest()
         except IOError:
             pass
-            
-    def _checkLocal(self, base, file_md5, hash_from_file=False):        
-        using_extra = False
-        filename = self.path + '/' + base
-        file_extra = self.extra + '/' + base
-        
-        if hash_from_file and isfile(filename):
-            md5 = basename(splitext(filename)[0])
-        else:
-            md5 = self._calculateMD5(file_extra)
-            using_extra = True
-         
-        if not md5:         
-            md5 = self._calculateMD5(filename)
-
-        if md5:
-            if md5 == file_md5:
-                if using_extra:
-                    print('Moving %s to %s' % (file_extra, filename))
-                    shutil.move(file_extra, filename)
-                else:
-                    print('%s already exists, skipping download' % filename)
-                return True
-            else:
-                print('md5 mismatch for %s' % base)
-        return False
                     
-    def downloadQueue(self, dl_list):
+    def downloadQueue(self, dl_list, nohash=False):
         for dl in dl_list:
             if self.abort:
                 break
-            base = basename(urlsplit(dl['file_url'])[2])
-            if self._checkLocal(base, dl['md5'], hash_from_file=True):                
-                continue
-            filename = self.path + '/' + base
             
+            base = basename(urlsplit(dl['file_url'])[2])            
+            filename = self.path + '/' + base
+            if nohash and isfile(filename):
+                print("%s already exists, skipping" % filename)
+                continue
+            md5 = self._calculateMD5(filename)
+            if md5:
+                if md5 == dl['md5']:
+                    print("%s already exists, skipping" % filename)
+                    continue
+                else:
+                    print("%s md5sum doesn't match, re-downloading")
+                        
             try:
                 local_file = open(filename, 'wb')
             except IOError:
