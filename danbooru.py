@@ -107,7 +107,7 @@ if __name__ == '__main__':
             rows = db.getFiles(100, offset)
             if not rows:
                 break
-            dl.downloadQueue(rows, False)
+            dl.downloadQueue(rows)
             offset += 100
             
     elif args.action == 'nepomuk':  

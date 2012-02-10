@@ -18,7 +18,7 @@
 import shutil
 import hashlib
 from time import sleep
-from os.path import basename, splitext
+from os.path import basename, splitext, isfile
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
@@ -34,41 +34,60 @@ class Downloader(object):
         
     def stopDownload(self):
         self.abort = True
+        
+    def _calculateMD5(self, name):
+        try:
+            file = open(name, 'rb')
+            md5_hash = hashlib.md5()
+            while True:
+                d = file.read(128)
+                if not d: break
+                md5_hash.update(d)
+            file.close()
+            return md5_hash.hexdigest()
+        except IOError:
+            pass
+            
+    def _checkLocal(self, base, file_md5, hash_from_file=False):        
+        using_extra = False
+        filename = self.path + '/' + base
+        file_extra = self.extra + '/' + base
+        
+        if hash_from_file and isfile(filename):
+            md5 = basename(splitext(filename)[0])
+        else:
+            md5 = self._calculateMD5(file_extra)            
+            using_extra = True
+         
+        if not md5:         
+            md5 = self._calculateMD5(filename)
 
-    def downloadQueue(self, dl_list, check=True):
+        if md5 and md5 == file_md5:            
+            if using_extra:
+                print('Moving %s to %s' % (file_extra, filename))
+                shutil.move(file_extra, filename)
+            else:
+                print('%s already exists, skipping download' % filename)
+            return True
+        return False
+                    
+    def downloadQueue(self, dl_list):
         for dl in dl_list:
-            for retry in range(0, 4):
-                if self.abort: break
-                file_extra = self.extra + '/' + basename(urlsplit(dl['file_url'])[2])            
-                filename = self.path + '/' + basename(urlsplit(dl['file_url'])[2])
-                try:
-                    ext = False
-                    try:
-                        f = open(file_extra, 'rb')
-                        ext = True
-                    except IOError:
-                        f = open(filename, 'rb')
-                    if check:
-                        md5_hash = hashlib.md5()
-                        while True:
-                            d = f.read(128)
-                            if not d: break
-                            md5_hash.update(d)
-                        f.close()
-                        md5 = md5_hash.hexdigest()
-                    else:
-                        print('Skipping md5 hash calculation')
-                        md5 = basename(splitext(filename)[0])
-                    if md5 == dl['md5']:
-                        print('%s already exists, skipping' % dl['file_url'])
-                        if ext:
-                            print('Moving %s to %s' % (file_extra, filename))
-                            shutil.move(file_extra, filename)
-                        continue
-                except IOError:
-                    pass
-                #TODO: handle file open error
+            if self.abort:
+                break
+            base = basename(urlsplit(dl['file_url'])[2])
+            if self._checkLocal(base, dl['md5'], hash_from_file=True):                
+                continue
+            filename = self.path + '/' + base
+            
+            try:
                 local_file = open(filename, 'wb')
+            except IOError:
+                print('Error while creating %s' % filename)
+                continue
+
+            retries = 0
+            while retries < 3:
                 try:
                     remote_file = urlopen(dl['file_url'])
                     shutil.copyfileobj(remote_file, local_file)
@@ -82,5 +101,6 @@ class Downloader(object):
                     print('\n>>> Error %s' % e.reason)
                 except HTTPError as e:
                     print('\n>>> Error %i: %s' % (e.code, e.msg))
-                print('Retrying (%i) in 3 seconds...', retry)
-                sleep(3)
+                retries += 1
+                print('Retrying (%i) in 2 seconds...' % retries)
+                sleep(2)
