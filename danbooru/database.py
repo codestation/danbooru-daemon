@@ -25,6 +25,12 @@ class Database(object):
     def __init__(self, dbname):
         self.dbname = dbname        
         self.conn = sqlite3.connect(dbname)
+        try:
+            f = open("danbooru-db.sql")
+            self.conn.executescript(f.read())
+            self.conn.commit()
+        except IOError:
+            pass
         
     def updatePosts(self, posts, commit=True):
         self.conn.executemany('UPDATE post SET width=:width,height=:height,' + 
