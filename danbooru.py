@@ -47,15 +47,18 @@ if __name__ == '__main__':
 
     limit = int(cfg.limit)
     tags = sys.argv[2]
-    abort = False    
-    
-    dl = Downloader(cfg.download_path)
+    abort = False
+    dl = None
+    nk = None
     
     def signal_handler(signal, frame):
-        global abort
+        global abort, dl, nk
         print('Ctrl+C detected, shutting down...')
         abort = True
-        dl.stopDownload()
+        if dl:
+            dl.stopDownload()
+        elif nk:
+            nk.abortTask()
 
     signal.signal(signal.SIGINT, signal_handler)
     
@@ -102,6 +105,7 @@ if __name__ == '__main__':
                 break
         
     elif args.action == 'download':
+        dl = Downloader(cfg.download_path)
         offset = 0
         while not abort:
             rows = db.getFiles(100, offset)
@@ -110,29 +114,7 @@ if __name__ == '__main__':
             dl.downloadQueue(rows)
             offset += 100
             
-    elif args.action == 'nepomuk':  
-        from danbooru.nepomuk import NepomukBus
-        nk = NepomukBus()
-        file_count = 1
-        
-        def process_dir(directory):  
-            global file_count
-            global abort
-                      
-            for name in os.listdir(directory):                
-                if abort: break
-                full_path = os.path.join(directory, name)
-                if isdir(full_path):
-                    process_dir(full_path)
-                elif isfile(full_path):
-                    print('(%i) Processing %s' % (file_count, name))
-                    post = db.getPost(name)
-                    if post:
-                        res = nk.getResource(full_path)
-                        nk.updateTags(res, post, skip=True)
-                        file_count += 1
-                    else:
-                        print('%s isn\'t in database' % name)
-
-        process_dir(cfg.download_path)
-        
+    elif args.action == 'nepomuk':
+        from danbooru.nepomuk import NepomukTask
+        nk = NepomukTask()
+        nk.updateDirectoryTags(cfg.download_path, db)

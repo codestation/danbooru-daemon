@@ -18,7 +18,7 @@
 import shutil
 import hashlib
 from time import sleep
-from os.path import basename, splitext, isfile, join
+from os.path import basename, isfile, join
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
