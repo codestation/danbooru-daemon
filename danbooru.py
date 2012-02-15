@@ -43,16 +43,15 @@ if __name__ == '__main__':
                                 'log_level', 'log_file']):
         sys.exit(1)
         
-    log_levels = {'WARNING': logging.WARNING, 'INFO': logging.INFO, 'DEBUG': logging.DEBUG}
-        
-    if not cfg.log_level in log_levels:
-        logging.error('Invalid log_level in config')
+    numeric_level = getattr(logging, cfg.log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        logging.error('Invalid log_level in config: %s' % cfg.log_level)
         sys.exit(1)
 
     if cfg.log_file:        
-        logging.basicConfig(filename=cfg.log_file, level=log_levels[cfg.log_level])
+        logging.basicConfig(filename=cfg.log_file, level=numeric_level)
     else:
-        logging.basicConfig(level=log_levels[cfg.log_level])
+        logging.basicConfig(level=numeric_level)
 
     board = Api(cfg.host, cfg.username, cfg.password, cfg.salt, cfg.dbname)
 
