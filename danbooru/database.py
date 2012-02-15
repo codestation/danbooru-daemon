@@ -94,7 +94,10 @@ class Database(object):
         self.addTags(posts, False)
         if commit:
             self.conn.commit()
-        return len(insert)
+        if update:
+            return (len(insert), len(upd))
+        else:
+            return (len(insert), )
 
     def getPost(self, file):
         def dict_factory(cursor, row):

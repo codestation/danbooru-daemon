@@ -17,6 +17,7 @@
 
 import shutil
 import hashlib
+import logging
 from time import sleep
 from os.path import basename, isfile, join
 from urllib.parse import urlsplit
@@ -55,22 +56,22 @@ class Downloader(object):
             subdir = base[0]
             filename = join(self.path, subdir, base)
             if nohash and isfile(filename):
-                print("(%i) %s already exists, skipping" % (self.total, filename))
+                logging.debug("(%i) %s already exists, skipping" % (self.total, filename))
                 self.total += 1
                 continue
             md5 = self._calculateMD5(filename)
             if md5:
                 if md5 == dl['md5']:
-                    print("(%i) %s already exists, skipping" % (self.total, filename))
+                    logging.debug("(%i) %s already exists, skipping" % (self.total, filename))
                     self.total += 1
                     continue
                 else:
-                    print("%s md5sum doesn't match, re-downloading")
+                    logging.warning("%s md5sum doesn't match, re-downloading")
                         
             try:
                 local_file = open(filename, 'wb')
             except IOError:
-                print('Error while creating %s' % filename)
+                logging.error('Error while creating %s' % filename)
                 continue
 
             retries = 0
@@ -81,13 +82,13 @@ class Downloader(object):
                     remote_file.close()                
                     local_file.close()
                     self.total += 1
-                    print('(%i) %s [OK]' % (self.total, dl['file_url']))
+                    logging.debug('(%i) %s [OK]' % (self.total, dl['file_url']))
                     sleep(1)
                     break
                 except URLError as e:
-                    print('\n>>> Error %s' % e.reason)
+                    logging.error('>>> Error %s' % e.reason)
                 except HTTPError as e:
-                    print('\n>>> Error %i: %s' % (e.code, e.msg))
+                    logging.error('>>> Error %i: %s' % (e.code, e.msg))
                 retries += 1
-                print('Retrying (%i) in 2 seconds...' % retries)
+                logging.warning('Retrying (%i) in 2 seconds...' % retries)
                 sleep(2)

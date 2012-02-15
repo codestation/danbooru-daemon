@@ -15,6 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import logging
 from os import listdir
 from os.path import abspath, join, isdir, isfile
 from PyKDE4.nepomuk import Nepomuk
@@ -72,7 +73,7 @@ class NepomukTask(object):
                 if isdir(full_path):
                     self.updateDirTags(full_path)
                 elif isfile(full_path):
-                    print('(%i) Processing %s' % (self.file_count, name))
+                    logging.debug('(%i) Processing %s' % (self.file_count, name))
                     post = self.db.getPost(name)
                     if post:
                         res = self.getResource(full_path)
@@ -80,7 +81,7 @@ class NepomukTask(object):
                         self.file_count += 1
                         loop.processEvents()
                     else:
-                        print('%s isn\'t in database' % name)
+                        logging.debug('%s isn\'t in database' % name)
             QCoreApplication.quit()
                 
         def updateFile(self):

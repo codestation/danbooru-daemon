@@ -15,11 +15,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import os
 import sys
 import signal
 import argparse
-from genericpath import isfile, isdir
+import logging
 from danbooru.api import Api
 from danbooru.database import Database
 from danbooru.settings import Settings
@@ -40,8 +39,20 @@ if __name__ == '__main__':
     
     cfg = Settings(args.config)
     if not cfg.load('danbooru',['host', 'username', 'password', 'salt', 
-                                'dbname', 'limit', 'download_path']):
+                                'dbname', 'limit', 'download_path',
+                                'log_level', 'log_file']):
         sys.exit(1)
+        
+    log_levels = {'WARNING': logging.WARNING, 'INFO': logging.INFO, 'DEBUG': logging.DEBUG}
+        
+    if not cfg.log_level in log_levels:
+        logging.error('Invalid log_level in config')
+        sys.exit(1)
+
+    if cfg.log_file:        
+        logging.basicConfig(filename=cfg.log_file, level=log_levels[cfg.log_level])
+    else:
+        logging.basicConfig(level=log_levels[cfg.log_level])
 
     board = Api(cfg.host, cfg.username, cfg.password, cfg.salt, cfg.dbname)
 
@@ -53,7 +64,7 @@ if __name__ == '__main__':
     
     def signal_handler(signal, frame):
         global abort, dl, nk
-        print('Ctrl+C detected, shutting down...')
+        logging.info('Ctrl+C detected, shutting down...')
         abort = True
         if dl:
             dl.stopDownload()
@@ -68,7 +79,7 @@ if __name__ == '__main__':
         else:
             posts = board.getPostsPage(tags, 1, 1)
             if not posts:
-                print('Error: cannot get last post id')
+                logging.error('Error: cannot get last post id')
                 sys.exit(1)
             return posts[0]['id'] + 1
     
@@ -76,21 +87,26 @@ if __name__ == '__main__':
     
     if args.action == 'update':
         if not args.tags:
-            print('No tags specified. Aborting.')
+            logging.error('No tags specified. Aborting.')
             sys.exit(1)
 
         last_id = getLastId(args.tags)
-        print('Last post id: %i' % last_id)
+        logging.debug('Fetching posts below id: %i' % last_id)
         while not abort:
             post_list = board.getPostsBefore(last_id, args.tags, limit)
             if post_list:
-                if db.addPosts(post_list) == 0:
-                    print('No more posts left')
+                result = db.addPosts(post_list)
+                if len(result) > 1:
+                    logging.debug('%i posts inserted, %i posts updated' % result)
+                else:
+                    logging.debug('%i posts inserted, no updates' % result)
+                if result[0] == 0:
+                    logging.debug('Stopping since no new posts were inserted')
                     break
                 last_id = post_list[-1]['id']
-                print('Next fetch id: %i' % last_id)
+                logging.debug('Fetching posts below id: %i' % last_id)
             else:
-                print('No posts returned')
+                logging.debug('No posts returned')
                 break
             
     elif args.action == 'tags':
@@ -100,7 +116,7 @@ if __name__ == '__main__':
             if tag_list:
                 db.addTags(tag_list)
                 last_id = tag_list[-1]['id']
-                print('Next fetch id: %i' % last_id)
+                logging.debug('Next fetch id: %i' % last_id)
             else:
                 break
         

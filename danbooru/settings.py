@@ -16,6 +16,7 @@
 #   limitations under the License.
 
 import configparser
+import logging
 
 class Settings(object):
     
@@ -32,9 +33,9 @@ class Settings(object):
                     setattr(self, key, self.config.get('default', key))
 
         except configparser.NoSectionError:
-            print('The section "%s" does not exist' % section)
+            logging.error('The section "%s" does not exist' % section)
         except configparser.NoOptionError:
-            print('The value for "%s" is missing' % key)
+            logging.error('The value for "%s" is missing' % key)
         else:
             return True
         return False
