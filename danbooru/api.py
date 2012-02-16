@@ -53,14 +53,17 @@ class Api(object):
         return posts
     
     def getPostsPage(self, tags, page, limit):
+        tags = ','.join(tags)
         url = self.host + self.post_api + '?tags=%s&page=%i&limit=%i' % (tags, page, limit) + self._loginData()
         return self.getPosts(url)
         
-    def getPostsBefore(self, post_id, tags, limit):        
+    def getPostsBefore(self, post_id, tags, limit):
+        tags = ','.join(tags)     
         url = self.host + self.post_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
         return self.getPosts(url)
     
-    def getTagsBefore(self, post_id, tags, limit):        
+    def getTagsBefore(self, post_id, tags, limit):  
+        tags = ','.join(tags)      
         url = self.host + self.tag_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
         return self.getPosts(url)
         

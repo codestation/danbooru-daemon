@@ -28,8 +28,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-c', '--config', dest='config', default='config.cfg',
             help='use the indicated config file')
-    parser.add_argument('-t', '--tags', dest='tags',
-            help='list of tags to use in search (join multiple "+")')
+    parser.add_argument('-t', '--tags', dest='tags', nargs='+',
+            help='list of tags to use in search')
     parser.add_argument('-a', '--action', dest='action', required=True,
             help='set the action to perform')
     parser.add_argument('-b', '--before-id', dest='before_id', 
@@ -38,9 +38,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     cfg = Settings(args.config)
-    if not cfg.load('danbooru',['host', 'username', 'password', 'salt', 
-                                'dbname', 'limit', 'download_path',
-                                'log_level', 'log_file']):
+    required = ['host', 'username', 'password', 'salt', 'dbname',
+                'limit', 'download_path', 'log_level', 'log_file']
+    optional = { 'default_tags': None, 'blacklist_tags': None, 'max_tags': 2 }
+    if not cfg.load('danbooru', required, optional):
         sys.exit(1)
         
     numeric_level = getattr(logging, cfg.log_level.upper(), None)
@@ -56,11 +57,23 @@ if __name__ == '__main__':
     board = Api(cfg.host, cfg.username, cfg.password, cfg.salt, cfg.dbname)
 
     limit = int(cfg.limit)
-    tags = sys.argv[2]
     abort = False
+
+    # use default tags from file
+    if cfg.default_tags:
+        default_tags = [x.strip() for x in cfg.default_tags.split(',')]
+        if not args.tags: args.tags = []
+        args.tags = args.tags + list(set(default_tags) - set(args.tags))
+        
+    # cut down the tag list if it have too much items
+    max_tags_number = int(cfg.max_tags)
+    if args.tags and len(args.tags) > max_tags_number:
+        logging.warning('Using more than %i tags, cutting down list' % max_tags_number)
+        args.tags = args.tags[:max_tags_number]
+
     dl = None
     nk = None
-    
+
     def signal_handler(signal, frame):
         global abort, dl, nk
         logging.info('Ctrl+C detected, shutting down...')
@@ -111,7 +124,7 @@ if __name__ == '__main__':
     elif args.action == 'tags':
         last_id = getLastId()
         while not abort:
-            tag_list = board.getTagsBefore(last_id, tags, limit)
+            tag_list = board.getTagsBefore(last_id, args.tags, limit)
             if tag_list:
                 db.addTags(tag_list)
                 last_id = tag_list[-1]['id']
