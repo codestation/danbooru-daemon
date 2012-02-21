@@ -42,17 +42,18 @@ class Database(object):
                               'sample_height=:sample_height,preview_url=:preview_url,' + 
                               'preview_width=:preview_width,preview_height=:preview_height,' + 
                               'has_notes=:has_notes,has_comments=:has_comments,' + 
-                              'has_children=:has_children WHERE id=:id', posts)
+                              'has_children=:has_children,board_url=:board_url WHERE id=:id',
+                              posts)
         if commit:            
             self.conn.commit()
         
     def insertPosts(self, posts, commit=True):
         self.conn.executemany('INSERT INTO post (id,width,height,file_size,file_url,author,creator_id,rating,source,' + 
                       'score,parent_id,status,change,md5,created_at,sample_url,sample_width,sample_height,' + 
-                      'preview_url,preview_width,preview_height,has_notes,has_comments,has_children) VALUES ' + 
+                      'preview_url,preview_width,preview_height,has_notes,has_comments,has_children,board_url) VALUES ' + 
                       '(:id,:width,:height,:file_size,:file_url,:author,:creator_id,:rating,:source,' + 
                       ':score,:parent_id,:status,:change,:md5,:created_at,:sample_url,:sample_width,:sample_height,' + 
-                      ':preview_url,:preview_width,:preview_height,:has_notes,:has_comments,:has_children)', posts)
+                      ':preview_url,:preview_width,:preview_height,:has_notes,:has_comments,:has_children,:board_url)', posts)
         if commit:
             self.conn.commit()
             

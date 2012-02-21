@@ -75,6 +75,7 @@ class Api(object):
             posts = json.loads(results)
             for post in posts:
                 post['tags'] = post['tags'].split(' ')
+                post['board_url'] = self.host
             return posts
         except URLError as e:
             print('\n>>> Error %s' % e.reason)

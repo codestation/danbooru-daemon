@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS "main"."post" (
     "preview_height" INTEGER NOT NULL,
     "has_notes" INTEGER NOT NULL,
     "has_comments" INTEGER NOT NULL,
-    "has_children" INTEGER NOT NULL
+    "has_children" INTEGER NOT NULL,
+    "board_url" TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS "post_md5_idx" ON "post" ("md5");
 CREATE TABLE IF NOT EXISTS "main"."post_tag" (

@@ -18,8 +18,9 @@
 import logging
 from os import listdir
 from os.path import abspath, join, isdir, isfile
+from PyKDE4.kdecore import KUrl
 from PyKDE4.nepomuk import Nepomuk
-from PyQt4.QtCore import QObject, QCoreApplication, QEventLoop, QUrl, QTimer
+from PyQt4.QtCore import QObject, QCoreApplication, QEventLoop, QTimer
 
 class NepomukTask(object):
     
@@ -92,37 +93,49 @@ class NepomukTask(object):
             
         def removeProperties(self, res, ontologies):
             for ontology in ontologies:
-                res.removeProperty(QUrl(self.ndbu_uri % ontology))
+                res.removeProperty(KUrl(self.ndbu_uri % ontology))
                 
         def setProperty(self, res, ontology, prop):
-            res.setProperty(QUrl(self.ndbu_uri % ontology), Nepomuk.Variant(prop))
+            res.setProperty(KUrl(self.ndbu_uri % ontology), Nepomuk.Variant(prop))
             
         def getResource(self, res):
             if isinstance(res, str):
                 absolute_path = abspath(res)
-                return Nepomuk.Resource(QUrl(absolute_path))
+                return Nepomuk.File(KUrl(absolute_path))
             else:
                 return res
-        
+            
+        def _addTag(self, res, name):
+            tag = Nepomuk.Tag(name)
+            tag.setLabel(name)
+            res.addTag(tag)
+            
         def updateFileTags(self, filename, post, skip=False):
             res = self.getResource(filename)
             
             if skip and self.ndbu_uri % 'postId' in res.allProperties():
                 return
-            
             self.removeTags(filename)
             for name in post['tags']:
-                tag = Nepomuk.Tag(name)
-                tag.setLabel(name)
-                res.addTag(tag)
-            if post['source']:     
-                self.setProperty(res, 'source', QUrl(post['source']))    
-            else:
-                self.removeProperties(res, ['source'])
-            self.setProperty(res, 'score', post['score'])
-            self.setProperty(res, 'author', post['author'])
-            self.setProperty(res, 'postRating', post['rating'])
-            self.setProperty(res, 'postId', post['id'])
+                self._addTag(res, name)
+            
+            url = KUrl(post['board_url'])
+            url_res = Nepomuk.Resource(url)
+            url_res.addType(Nepomuk.Vocabulary.NFO.Website())
+            res.addIsRelated(url_res)
+            
+            if post['source']:
+                url = KUrl(post['source'])
+                res.setDescription("Source: %s" % url.prettyUrl())
+
+            if post['score']:
+                self._addTag(res, "score:%s" % post['score'])
+            if post['author']:
+                self._addTag(res, "author:%s" % post['author'])
+            if post['rating']:
+                self._addTag(res, "rating:%s" % post['rating'])
+            if post['id']:
+                self._addTag(res, "id:%s" % post['id'])    
                 
         def setRating(self, file, rating):
             if rating not in range(0, 11): return
