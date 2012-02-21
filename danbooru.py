@@ -30,17 +30,22 @@ if __name__ == '__main__':
             help='use the indicated config file')
     parser.add_argument('-t', '--tags', dest='tags', nargs='+',
             help='list of tags to use in search')
+    parser.add_argument('-b', '--blacklist', dest='blacklist', nargs='+',
+            help='list of tags to skip in search')
     parser.add_argument('-a', '--action', dest='action', required=True,
             help='set the action to perform')
-    parser.add_argument('-b', '--before-id', dest='before_id', 
+    parser.add_argument('-i', '--before-id', dest='before_id', 
             help='search using this id as starting point')
     
     args = parser.parse_args()
     
     cfg = Settings(args.config)
+    
     required = ['host', 'username', 'password', 'salt', 'dbname',
                 'limit', 'download_path', 'log_level', 'log_file']
+    
     optional = { 'default_tags': None, 'blacklist_tags': None, 'max_tags': 2 }
+    
     if not cfg.load('danbooru', required, optional):
         sys.exit(1)
         
@@ -54,7 +59,7 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=numeric_level)
 
-    board = Api(cfg.host, cfg.username, cfg.password, cfg.salt, cfg.dbname)
+    board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
 
     limit = int(cfg.limit)
     abort = False
@@ -64,6 +69,11 @@ if __name__ == '__main__':
         default_tags = [x.strip() for x in cfg.default_tags.split(',')]
         if not args.tags: args.tags = []
         args.tags = args.tags + list(set(default_tags) - set(args.tags))
+        
+    if cfg.blacklist_tags:
+        blacklist_tags = [x.strip() for x in cfg.blacklist_tags.split(',')]
+        if not args.blacklist: args.blacklist = []
+        args.blacklist = args.blacklist + list(set(blacklist_tags) - set(args.blacklist))
         
     # cut down the tag list if it have too much items
     max_tags_number = int(cfg.max_tags)
@@ -89,7 +99,7 @@ if __name__ == '__main__':
         if args.before_id:
             return int(args.before_id)
         else:
-            posts = board.getPostsPage(tags, 1, 1)
+            posts = board.getPostsPage(tags, None, 1, 1)
             if not posts:
                 logging.error('Error: cannot get last post id')
                 sys.exit(1)
@@ -105,7 +115,7 @@ if __name__ == '__main__':
         last_id = getLastId(args.tags)
         logging.debug('Fetching posts below id: %i' % last_id)
         while not abort:
-            post_list = board.getPostsBefore(last_id, args.tags, limit)
+            post_list = board.getPostsBefore(last_id, args.tags, args.blacklist, limit)
             if post_list:
                 result = db.addPosts(post_list)
                 if len(result) > 1:

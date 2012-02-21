@@ -26,14 +26,14 @@ from urllib.error import URLError, HTTPError
 
 class Downloader(object):
     
-    total = 0
-    abort = False
+    _total = 0
+    _abort = False
 
     def __init__(self, path):
         self.path = path
         
     def stopDownload(self):
-        self.abort = True
+        self._abort = True
         
     def _calculateMD5(self, name):
         try:
@@ -50,20 +50,20 @@ class Downloader(object):
                     
     def downloadQueue(self, dl_list, nohash=False):
         for dl in dl_list:
-            if self.abort: break
+            if self._abort: break
             
             base = basename(urlsplit(dl['file_url'])[2])
             subdir = base[0]
             filename = join(self.path, subdir, base)
             if nohash and isfile(filename):
-                logging.debug("(%i) %s already exists, skipping" % (self.total, filename))
-                self.total += 1
+                logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
+                self._total += 1
                 continue
             md5 = self._calculateMD5(filename)
             if md5:
                 if md5 == dl['md5']:
-                    logging.debug("(%i) %s already exists, skipping" % (self.total, filename))
-                    self.total += 1
+                    logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
+                    self._total += 1
                     continue
                 else:
                     logging.warning("%s md5sum doesn't match, re-downloading")
@@ -81,8 +81,8 @@ class Downloader(object):
                     shutil.copyfileobj(remote_file, local_file)
                     remote_file.close()                
                     local_file.close()
-                    self.total += 1
-                    logging.debug('(%i) %s [OK]' % (self.total, dl['file_url']))
+                    self._total += 1
+                    logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))
                     sleep(1)
                     break
                 except URLError as e:

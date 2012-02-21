@@ -20,7 +20,33 @@ import sqlite3
 
 class Database(object):
     
-    ratings = {'s': 'Safe', 'q': 'Questionable', 'e': 'Explicit'}
+    ratings = {'s': 'safe', 'q': 'questionable', 'e': 'explicit'}
+    
+    post_fields = [
+                 'width',
+                 'height',
+                 'file_size',
+                 'file_url',
+                 'author',
+                 'creator_id',
+                 'rating',
+                 'source',
+                 'score',
+                 'parent_id',
+                 'status,change',
+                 'md5',
+                 'created_at',
+                 'sample_url',
+                 'sample_width',
+                 'sample_height',
+                 'preview_url',
+                 'preview_width',
+                 'preview_height',
+                 'has_notes',
+                 'has_comments',
+                 'has_children',
+                 'board_url'
+                 ]
 
     def __init__(self, dbname):
         self.dbname = dbname        
@@ -33,27 +59,15 @@ class Database(object):
             pass
         
     def updatePosts(self, posts, commit=True):
-        self.conn.executemany('UPDATE post SET width=:width,height=:height,' + 
-                              'file_size=:file_size,file_url=:file_url,author=:author,' + 
-                              'creator_id=:creator_id,rating=:rating,source=:source,' + 
-                              'score=:score,parent_id=:parent_id,status=:status,' + 
-                              'change=:change,md5=:md5,created_at=:created_at,' + 
-                              'sample_url=:sample_url,sample_width=:sample_width,' + 
-                              'sample_height=:sample_height,preview_url=:preview_url,' + 
-                              'preview_width=:preview_width,preview_height=:preview_height,' + 
-                              'has_notes=:has_notes,has_comments=:has_comments,' + 
-                              'has_children=:has_children,board_url=:board_url WHERE id=:id',
-                              posts)
+        fields = ",".join("%s=:%s" % (x,x) for x in self.post_fields)        
+        self.conn.executemany('UPDATE post SET %s WHERE id=:id' % fields, posts)
         if commit:            
             self.conn.commit()
         
     def insertPosts(self, posts, commit=True):
-        self.conn.executemany('INSERT INTO post (id,width,height,file_size,file_url,author,creator_id,rating,source,' + 
-                      'score,parent_id,status,change,md5,created_at,sample_url,sample_width,sample_height,' + 
-                      'preview_url,preview_width,preview_height,has_notes,has_comments,has_children,board_url) VALUES ' + 
-                      '(:id,:width,:height,:file_size,:file_url,:author,:creator_id,:rating,:source,' + 
-                      ':score,:parent_id,:status,:change,:md5,:created_at,:sample_url,:sample_width,:sample_height,' + 
-                      ':preview_url,:preview_width,:preview_height,:has_notes,:has_comments,:has_children,:board_url)', posts)
+        fields = ",".join(self.post_fields)
+        values = ",".join(":%s" % x for x in self.post_fields)
+        self.conn.executemany('INSERT INTO post (id,%s) VALUES(:id,%s)' % (fields,values), posts)
         if commit:
             self.conn.commit()
             

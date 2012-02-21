@@ -20,6 +20,7 @@ from os import listdir
 from os.path import abspath, join, isdir, isfile
 from PyKDE4.kdecore import KUrl
 from PyKDE4.nepomuk import Nepomuk
+from PyKDE4.soprano import Soprano
 from PyQt4.QtCore import QObject, QCoreApplication, QEventLoop, QTimer
 
 class NepomukTask(object):
@@ -50,7 +51,7 @@ class NepomukTask(object):
         
         ndbu_uri = 'http://www.semanticdesktop.org/ontologies/2012/02/07/ndbu#%s'
         file_count = 1        
-        abort = False
+        _abort = False
         
         def __init__(self):
             QObject.__init__(self)
@@ -64,12 +65,12 @@ class NepomukTask(object):
             self.db = db
             
         def cancelJob(self):
-            self.abort = True
+            self._abort = True
 
         def updateDirTags(self, directory):
             loop = QEventLoop()
             for name in listdir(directory):
-                if self.abort: break
+                if self._abort: break
                 full_path = join(directory, name)
                 if isdir(full_path):
                     self.updateDirTags(full_path)
@@ -113,30 +114,36 @@ class NepomukTask(object):
         def updateFileTags(self, filename, post, skip=False):
             res = self.getResource(filename)
             
-            if skip and self.ndbu_uri % 'postId' in res.allProperties():
+            if skip and res.hasProperty(Soprano.Vocabulary.NAO.personalIdentifier()):
                 return
-            self.removeTags(filename)
+
+            #remove all current tags
+            res.removeProperty(res.tagUri())
+
             for name in post['tags']:
                 self._addTag(res, name)
             
             url = KUrl(post['board_url'])
             url_res = Nepomuk.Resource(url)
             url_res.addType(Nepomuk.Vocabulary.NFO.Website())
+            url_res.setLabel(url.prettyUrl())
             res.addIsRelated(url_res)
             
             if post['source']:
-                url = KUrl(post['source'])
-                res.setDescription("Source: %s" % url.prettyUrl())
+                res.setDescription("Source: %s" % KUrl(post['source']).prettyUrl())
 
             if post['score']:
-                self._addTag(res, "score:%s" % post['score'])
+                res.addProperty(Soprano.Vocabulary.NAO.rating(), Nepomuk.Variant(post['score']))
+
             if post['author']:
-                self._addTag(res, "author:%s" % post['author'])
-            if post['rating']:
-                self._addTag(res, "rating:%s" % post['rating'])
-            if post['id']:
-                self._addTag(res, "id:%s" % post['id'])    
+                res.addProperty(Soprano.Vocabulary.NAO.contributor(), Nepomuk.Variant(post['author']))
                 
+            if post['rating']:
+                self._addTag(res, "rating-%s" % post['rating'])
+                
+            res.addProperty(Soprano.Vocabulary.NAO.personalIdentifier(), Nepomuk.Variant(str(post['id'])))
+            
+            
         def setRating(self, file, rating):
             if rating not in range(0, 11): return
             resource = self.getResource(file)

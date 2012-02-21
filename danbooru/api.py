@@ -17,6 +17,7 @@
 
 import json
 import hashlib
+import logging
 from time import sleep, time
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
@@ -28,17 +29,16 @@ class Api(object):
 
     _delta_time = 0
 
-    def __init__(self, host, username, password, salt, dbname):
+    def __init__(self, host, username, password, salt):
         self.host = host
         self.username = username
         self.password = password
         self.salt = salt
-        self.dbname = dbname
         
     def _wait(self):
         self._delta_time = time() - self._delta_time
         if self._delta_time < 1.2:
-            sleep(1 - self._delta_time)
+            sleep(1.2 - self._delta_time)
 
     def _loginData(self):
         sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
@@ -52,22 +52,23 @@ class Api(object):
             post['tags'] = post['tags'].split(' ')
         return posts
     
-    def getPostsPage(self, tags, page, limit):
+    def getPostsPage(self, tags, blacklist, page, limit):
         tags = ','.join(tags)
         url = self.host + self.post_api + '?tags=%s&page=%i&limit=%i' % (tags, page, limit) + self._loginData()
-        return self.getPosts(url)
+        return self.getPosts(url, blacklist)
         
-    def getPostsBefore(self, post_id, tags, limit):
+    def getPostsBefore(self, post_id, tags, blacklist, limit):
         tags = ','.join(tags)     
         url = self.host + self.post_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
-        return self.getPosts(url)
+        return self.getPosts(url, blacklist)
     
-    def getTagsBefore(self, post_id, tags, limit):  
-        tags = ','.join(tags)      
-        url = self.host + self.tag_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
-        return self.getPosts(url)
+    def getTagsBefore(self, post_id, tags, limit):
+        pass  
+        #tags = ','.join(tags)      
+        #url = self.host + self.tag_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
+        #return self.getPosts(url)
         
-    def getPosts(self, url):
+    def getPosts(self, url, blacklist):
         self._wait()
         try:
             response = urlopen(url)
@@ -76,6 +77,15 @@ class Api(object):
             for post in posts:
                 post['tags'] = post['tags'].split(' ')
                 post['board_url'] = self.host
+
+            if blacklist:
+                post_count = len(posts)
+                # delete posts that have tags in blacklist
+                posts[:] = [x for x in posts if not set(x['tags']).intersection(blacklist)]
+                post_count = post_count - len(posts)
+                if post_count > 0:
+                    logging.debug("%i posts filtered by the blacklist" % post_count)
+
             return posts
         except URLError as e:
             print('\n>>> Error %s' % e.reason)
