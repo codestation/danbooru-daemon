@@ -33,7 +33,8 @@ class Database(object):
                  'source',
                  'score',
                  'parent_id',
-                 'status,change',
+                 'status',
+                 'change',
                  'md5',
                  'created_at',
                  'sample_url',
@@ -59,7 +60,7 @@ class Database(object):
             pass
         
     def updatePosts(self, posts, commit=True):
-        fields = ",".join("%s=:%s" % (x,x) for x in self.post_fields)        
+        fields = ",".join("%s=:%s" % (x,x) for x in self.post_fields)
         self.conn.executemany('UPDATE post SET %s WHERE id=:id' % fields, posts)
         if commit:            
             self.conn.commit()
