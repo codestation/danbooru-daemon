@@ -50,6 +50,10 @@ class Api(object):
         posts = json.loads(results)
         for post in posts:
             post['tags'] = post['tags'].split(' ')
+            if not "has_comments" in post:
+                post['has_comments'] = None
+            if not "has_notes" in post:
+                post['has_notes'] = None
         return posts
     
     def getPostsPage(self, tags, blacklist, page, limit):
@@ -76,7 +80,10 @@ class Api(object):
             posts = json.loads(results)
             for post in posts:
                 post['tags'] = post['tags'].split(' ')
-                post['board_url'] = self.host
+                if not "has_comments" in post:
+                    post['has_comments'] = None
+                if not "has_notes" in post:
+                    post['has_notes'] = None
 
             if blacklist:
                 post_count = len(posts)

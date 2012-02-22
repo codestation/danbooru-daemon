@@ -44,7 +44,7 @@ class NepomukTask(object):
         self._initNepomuk()                
         self.job = self.NepomukJob()
         self.job.setFileData(file, db)
-        QTimer.singleShot(0, self.job.updateFile)
+        QTimer.singleShot(1000, self.job.updateFile)
         return self.app.exec_()  
     
     class NepomukJob(QObject):

@@ -28,6 +28,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-c', '--config', dest='config', default='config.cfg',
             help='use the indicated config file')
+    parser.add_argument('-s', '--section', dest='section', default='danbooru',
+            help='select the section from the config file')
     parser.add_argument('-t', '--tags', dest='tags', nargs='+',
             help='list of tags to use in search')
     parser.add_argument('-b', '--blacklist', dest='blacklist', nargs='+',
@@ -42,11 +44,12 @@ if __name__ == '__main__':
     cfg = Settings(args.config)
     
     required = ['host', 'username', 'password', 'salt', 'dbname',
-                'limit', 'download_path', 'log_level', 'log_file']
+                'limit', 'download_path', 'log_level', 'log_file',
+                'fetch_mode']
     
     optional = { 'default_tags': None, 'blacklist_tags': None, 'max_tags': 2 }
     
-    if not cfg.load('danbooru', required, optional):
+    if not cfg.load(args.section, required, optional):
         sys.exit(1)
         
     numeric_level = getattr(logging, cfg.log_level.upper(), None)
@@ -106,16 +109,28 @@ if __name__ == '__main__':
             return posts[0]['id'] + 1
     
     db = Database(cfg.dbname)
-    
+    db.setHost(cfg.host)
     if args.action == 'update':
         if not args.tags:
             logging.error('No tags specified. Aborting.')
             sys.exit(1)
 
-        last_id = getLastId(args.tags)
-        logging.debug('Fetching posts below id: %i' % last_id)
+        if cfg.fetch_mode == "id":
+            last_id = getLastId(args.tags)
+            logging.debug('Fetching posts below id: %i' % last_id)
+        elif cfg.fetch_mode == "page":
+            page = 1
+            logging.debug('Fetching posts from page: %i' % page)
+        else:
+            logging.error("Invalid fetch_mode")
+            sys.exit(1)
+
         while not abort:
-            post_list = board.getPostsBefore(last_id, args.tags, args.blacklist, limit)
+            if cfg.fetch_mode == "id":
+                post_list = board.getPostsBefore(last_id, args.tags, args.blacklist, limit)
+            elif cfg.fetch_mode == "page":
+                post_list = board.getPostsPage(args.tags, args.blacklist, page, limit)
+        
             if post_list:
                 result = db.addPosts(post_list)
                 if len(result) > 1:
@@ -125,8 +140,13 @@ if __name__ == '__main__':
                 if result[0] == 0:
                     logging.debug('Stopping since no new posts were inserted')
                     break
-                last_id = post_list[-1]['id']
-                logging.debug('Fetching posts below id: %i' % last_id)
+                if cfg.fetch_mode == "id":
+                    last_id = post_list[-1]['id']
+                    logging.debug('Fetching posts below id: %i' % last_id)
+                elif cfg.fetch_mode == "page":
+                    page += 1
+                    logging.debug('Fetching posts from page: %i' % page)
+
             else:
                 logging.debug('No posts returned')
                 break

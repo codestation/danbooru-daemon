@@ -19,14 +19,14 @@ import shutil
 import hashlib
 import logging
 from time import sleep
-from os.path import basename, isfile, join
+from os.path import basename, isfile, join, splitext
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
 class Downloader(object):
     
-    _total = 0
+    _total = 1
     _abort = False
 
     def __init__(self, path):
@@ -53,8 +53,8 @@ class Downloader(object):
             if self._abort: break
             
             base = basename(urlsplit(dl['file_url'])[2])
-            subdir = base[0]
-            filename = join(self.path, subdir, base)
+            subdir = dl['md5'][0]
+            filename = join(self.path, subdir, dl['md5'] + splitext(base)[1])
             if nohash and isfile(filename):
                 logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
                 self._total += 1
@@ -81,8 +81,8 @@ class Downloader(object):
                     shutil.copyfileobj(remote_file, local_file)
                     remote_file.close()                
                     local_file.close()
+                    logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))                    
                     self._total += 1
-                    logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))
                     sleep(1)
                     break
                 except URLError as e:
