@@ -109,7 +109,7 @@ class Database(object):
         id_list = [x['id'] for x in posts]
         placeholders = ', '.join('?' for unused in id_list)
         rows = self.conn.execute('SELECT id FROM post WHERE board_id=%i AND id IN (%s)' % (self.board_id, placeholders), id_list)
-        exists = [x[0] for x in rows] 
+        exists = [x[0] for x in rows]
         if update:
             upd = [x for x in posts if x['id'] in exists]
             self.updatePosts(upd, False)

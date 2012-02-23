@@ -56,14 +56,13 @@ class Downloader(object):
             subdir = dl['md5'][0]
             filename = join(self.path, subdir, dl['md5'] + splitext(base)[1])
             if nohash and isfile(filename):
-                logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
-                self._total += 1
+                #logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
+                #self._total += 1
                 continue
             md5 = self._calculateMD5(filename)
             if md5:
                 if md5 == dl['md5']:
-                    logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
-                    self._total += 1
+                    logging.debug("%s already exists, skipping" % filename)
                     continue
                 else:
                     logging.warning("%s md5sum doesn't match, re-downloading")
