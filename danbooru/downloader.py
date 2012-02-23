@@ -27,13 +27,13 @@ from urllib.error import URLError, HTTPError
 class Downloader(object):
     
     _total = 1
-    _abort = False
+    _stop = False
 
     def __init__(self, path):
         self.path = path
         
-    def stopDownload(self):
-        self._abort = True
+    def stop(self):
+        self._stop = True
         
     def _calculateMD5(self, name):
         try:
@@ -50,7 +50,7 @@ class Downloader(object):
                     
     def downloadQueue(self, dl_list, nohash=False):
         for dl in dl_list:
-            if self._abort: break
+            if self._stop: break
             
             base = basename(urlsplit(dl['file_url'])[2])
             subdir = dl['md5'][0]

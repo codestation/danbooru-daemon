@@ -27,7 +27,9 @@ from danbooru.downloader import Downloader
 
 class Daemon(object):
     
-    _abort = False
+    _stop = False
+    
+    abort_list = {}
     
     config_required = [
                        'host',
@@ -98,7 +100,15 @@ class Daemon(object):
             args.tags = args.tags[:max_tags_number]
             
     def abort(self):
-        self._abort = True
+        self._stop = True
+        for k in self.abort_list.keys():
+            self.abort_list[k].abort()
+            
+    def registerClassSignal(self, cls):
+        self.abort_list[cls.__class__.__name__] = cls
+        
+    def unregisterClassSignal(self, cls):
+        del self.abort_list[cls.__class__.__name__]
             
     def signalHandler(self, signal, frame):
         logging.info('Ctrl+C detected, shutting down...')
@@ -154,18 +164,18 @@ class Daemon(object):
         sleep_time = cfg.fetch_interval
         sections = [x.strip() for x in cfg.fetch_from.split(' ')]
 
-        while not self._abort:
+        while not self._stop:
             for section in sections:
-                if self._abort: break
+                if self._stop: break
                 cfg = self.readConfig(args.config, section, self.config_required, self.config_optional)
                 db.setHost(cfg.host)                          
                 board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
                 logging.debug("Run upload mode for %s" % section)
                 self.run_update(args, cfg, board, db)
-                if self._abort: break
+                if self._stop: break
                 logging.debug("Run download mode for %s" % section)
                 self.run_download(cfg, db)
-                if self._abort: break
+                if self._stop: break
                 #logging.debug("Run nepomuk mode for %s" % section)
                 #self.run_nepomuk(cfg, db)
                 #if self._abort: break
@@ -187,7 +197,7 @@ class Daemon(object):
             logging.error("Invalid fetch_mode")
             sys.exit(1)
 
-        while not self._abort:
+        while not self._stop:
             if cfg.fetch_mode == "id":
                 post_list = board.getPostsBefore(last_id, args.tags, args.blacklist, cfg.limit)
             elif cfg.fetch_mode == "page":
@@ -214,22 +224,26 @@ class Daemon(object):
             
     def run_download(self, cfg, db):
         dl = Downloader(cfg.download_path)
+        self.registerClassSignal(dl)
         offset = 0
-        while not self._abort:
+        while not self._stop:
             rows = db.getFiles(100, offset)
             if not rows:
                 break
             dl.downloadQueue(rows, cfg.skip_file_check)
             offset += 100
+        self.unregisterClassSignal(dl)
             
     def run_nepomuk(self, cfg, db):
         from danbooru.nepomuk import NepomukTask
         nk = NepomukTask()
+        self.registerClassSignal(nk)
         nk.updateDirectoryTags(cfg.download_path, db)
+        self.unregisterClassSignal(nk)
             
     def run_tags(self, args, cfg, db, board):
         last_id = self.getLastId(args.tags, board, args.before_id)
-        while not self._abort:
+        while not self._stop:
             tag_list = board.getTagsBefore(last_id, args.tags, cfg.limit)
             if tag_list:
                 db.addTags(tag_list)

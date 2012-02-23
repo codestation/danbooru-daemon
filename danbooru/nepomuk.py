@@ -25,7 +25,7 @@ from PyQt4.QtCore import QObject, QCoreApplication, QEventLoop, QTimer
 
 class NepomukTask(object):
     
-    def abortTask(self):
+    def stop(self):
         self.job.cancelJob()
     
     def _initNepomuk(self):            
@@ -51,7 +51,7 @@ class NepomukTask(object):
         
         ndbu_uri = 'http://www.semanticdesktop.org/ontologies/2012/02/07/ndbu#%s'
         file_count = 1        
-        _abort = False
+        _stop = False
         
         def __init__(self):
             QObject.__init__(self)
@@ -65,12 +65,12 @@ class NepomukTask(object):
             self.db = db
             
         def cancelJob(self):
-            self._abort = True
+            self._stop = True
 
         def updateDirTags(self, directory):
             loop = QEventLoop()
             for name in listdir(directory):
-                if self._abort: break
+                if self._stop: break
                 full_path = join(directory, name)
                 if isdir(full_path):
                     self.updateDirTags(full_path)
