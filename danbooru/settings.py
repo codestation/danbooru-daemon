@@ -23,21 +23,33 @@ class Settings(object):
     def __init__(self, configfile):    
         self.config = configparser.ConfigParser(interpolation=None)
         self.config.read(configfile)
+        
+    def set_value(self, key, section):
+        if isinstance(key, tuple):
+            if key[1] == int:
+                setattr(self, key[0], self.config.getint(section, key[0]))
+            elif key[1] == bool:
+                setattr(self, key[0], self.config.getboolean(section, key[0]))
+            else:
+                logging.warn("Unknown type: %s", key[1])
+                setattr(self, key[0], self.config.get(section, key[0]))
+        else:
+            setattr(self, key, self.config.get(section, key))
     
     def load(self, section, required, optional):
         try:
             for key in required:
                 try:
-                    setattr(self, key, self.config.get(section, key))
+                    self.set_value(key, section)
                 except configparser.NoOptionError:
-                    setattr(self, key, self.config.get('default', key))
+                    self.set_value(key, "default")
                     
             for key in optional:
                 try:
-                    setattr(self, key, self.config.get(section, key))
+                    self.set_value(key, section)
                 except configparser.NoOptionError:
                     try:
-                        setattr(self, key, self.config.get('default', key))
+                        self.set_value(key, "default")
                     except configparser.NoOptionError:
                         setattr(self, key, optional[key])
 
