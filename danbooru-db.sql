@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS "main"."board" (
 CREATE TABLE IF NOT EXISTS "main"."post" (
     "id" INTEGER NOT NULL,    
     "board_id" INTEGER NOT NULL,
-    "width" INTEGER NOT NULL,
-    "height" INTEGER NOT NULL,
-    "file_size" INTEGER NOT NULL,
+    "width" INTEGER,
+    "height" INTEGER,
+    "file_size" INTEGER,
     "file_url" TEXT NOT NULL,
     "author" TEXT,
     "creator_id" INTEGER,
