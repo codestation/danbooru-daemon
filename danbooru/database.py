@@ -68,7 +68,7 @@ class Database(object):
         self.hosts = [{'name':x[0], 'id':x[1]} for x in rows]        
         self.board_id = [x['id'] for x in self.hosts if x['name'] == host][0]
         
-    def updatePosts(self, posts, board_id, commit=True):
+    def updatePosts(self, posts, commit=True):
         fields = ",".join("%s=:%s" % (x,x) for x in self.post_fields)
         self.conn.executemany('UPDATE post SET %s WHERE id=:id AND board_id=%i' % (fields, self.board_id), posts)
         if commit:            
@@ -97,28 +97,27 @@ class Database(object):
             exists = [x[0] for x in rows]
             ins = [x for x in post['tags'] if x not in exists]
             if ins:
-                self.insertTags(post['id'], ins, False)
+                self.insertTags(post['id'], ins, commit)
             if delete:
                 dele = [(x,) for x in exists if x not in post['tags']]
                 if dele:
-                    self.deleteTags(post['id'], dele, False)
+                    self.deleteTags(post['id'], dele, commit)
         if commit:
             self.conn.commit()
             
-    def addPosts(self, posts, update=True, commit=True):
+    def addPosts(self, posts, update=True):
         id_list = [x['id'] for x in posts]
         placeholders = ', '.join('?' for unused in id_list)
         rows = self.conn.execute('SELECT id FROM post WHERE board_id=%i AND id IN (%s)' % (self.board_id, placeholders), id_list)
         exists = [x[0] for x in rows]
         if update:
             upd = [x for x in posts if x['id'] in exists]
-            self.updatePosts(upd, False)
+            self.updatePosts(upd, commit=False)
             
         insert = [x for x in posts if not x['id'] in exists]
-        self.insertPosts(insert, False)
-        self.addTags(posts, delete=True, commit=False)
-        if commit:
-            self.conn.commit()
+        self.insertPosts(insert, commit=False)
+        self.addTags(posts, commit=False)
+        self.conn.commit()
         if update:
             return (len(insert), len(upd))
         else:

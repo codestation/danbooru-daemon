@@ -15,6 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import re
 import json
 import hashlib
 import logging
@@ -79,7 +80,8 @@ class Api(object):
             results = response.read().decode('utf8')
             posts = json.loads(results)
             for post in posts:
-                post['tags'] = post['tags'].split(' ')
+                #remove all extra spaces
+                post['tags'] = re.sub(' +',' ',post['tags']).split(' ')
                 if not "has_comments" in post:
                     post['has_comments'] = None
                 if not "has_notes" in post:
