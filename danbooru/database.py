@@ -91,17 +91,17 @@ class Database(object):
         if commit:
             self.conn.commit()
             
-    def addTags(self, posts, board_id, delete=True, commit=True):
+    def addTags(self, posts, delete=True, commit=True):
         for post in posts:
             rows = self.conn.execute('SELECT tag_name, post_id FROM post_tag WHERE post_id=:id AND board_id=%i' % self.board_id, post)
             exists = [x[0] for x in rows]
-            if exists:
-                ins = [x for x in post['tags'] if x not in exists]
+            ins = [x for x in post['tags'] if x not in exists]
+            if ins:
                 self.insertTags(post['id'], ins, False)
-                if delete:
-                    dele = [(x,) for x in exists if x not in post['tags']]
-                    if dele:
-                        self.deleteTags(post['id'], dele, False)
+            if delete:
+                dele = [(x,) for x in exists if x not in post['tags']]
+                if dele:
+                    self.deleteTags(post['id'], dele, False)
         if commit:
             self.conn.commit()
             
@@ -116,7 +116,7 @@ class Database(object):
             
         insert = [x for x in posts if not x['id'] in exists]
         self.insertPosts(insert, False)
-        self.addTags(posts, False)
+        self.addTags(posts, delete=True, commit=False)
         if commit:
             self.conn.commit()
         if update:
