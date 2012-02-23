@@ -18,7 +18,7 @@
 import json
 import hashlib
 import logging
-from time import sleep, time
+from time import sleep, time, gmtime, strftime
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
@@ -84,6 +84,8 @@ class Api(object):
                     post['has_comments'] = None
                 if not "has_notes" in post:
                     post['has_notes'] = None
+                if "created_at" in post and isinstance(post['created_at'], dict):                    
+                    post['created_at'] = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime(post['created_at']['s']))
 
             if blacklist:
                 post_count = len(posts)
