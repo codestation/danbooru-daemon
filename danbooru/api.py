@@ -82,6 +82,8 @@ class Api(object):
             for post in posts:
                 #remove all extra spaces
                 post['tags'] = re.sub(' +',' ',post['tags']).split(' ')
+                #remove duplicates
+                post['tags'] = list(set(post['tags']))
                 if not "has_comments" in post:
                     post['has_comments'] = None
                 if not "has_notes" in post:
