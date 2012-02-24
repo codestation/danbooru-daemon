@@ -50,7 +50,6 @@ class NepomukTask(object):
     
     class NepomukJob(QObject):
         
-        ndbu_uri = 'http://www.semanticdesktop.org/ontologies/2012/02/07/ndbu#%s'
         file_count = 1        
         _stop = False
         
@@ -120,10 +119,13 @@ class NepomukTask(object):
 
             #remove all current tags
             res.removeProperty(res.tagUri())
+            #res.removeProperty(Soprano.Vocabulary.NAO.isRelated())
+            #res.removeProperty(Soprano.Vocabulary.NAO.rating())
+            #res.removeProperty(Soprano.Vocabulary.NAO.contributor())
+            #res.removeProperty(Soprano.Vocabulary.NAO.personalIdentifier())
 
             for name in post['tags']:
                 self._addTag(res, name)
-            
             url = KUrl(post['board_url'])
             url_res = Nepomuk.Resource(url)
             url_res.addType(Nepomuk.Vocabulary.NFO.Website())

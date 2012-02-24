@@ -59,6 +59,10 @@ class Database(object):
         except IOError:
             pass
         
+    def getHost(self, board_id):
+        row = self.conn.execute('SELECT name FROM board WHERE id=%i' % board_id)
+        return row.fetchone()[0]
+        
     def setHost(self, host):
         try:
             self.conn.execute('INSERT INTO board (name) VALUES (?)', [host]);
@@ -140,6 +144,7 @@ class Database(object):
                 row = self.conn.execute('SELECT tag_name FROM post_tag WHERE post_id =:id AND board_id=%i' % host['id'], data)
                 data['tags'] = [x[0] for x in row]
                 data['rating'] = self.ratings[data['rating']]
+                data['board_url'] = self.getHost(data['board_id'])
                 return data
             
     def fileExists(self, md5):
