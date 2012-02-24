@@ -185,7 +185,7 @@ class Daemon(object):
                 #logging.debug("Run nepomuk mode for %s" % section)
                 #self.run_nepomuk(cfg, db)
                 #if self._abort: break
-                logging.debug("Waiting for %i seconds" % sleep_time)
+            logging.debug("Waiting for %i seconds" % sleep_time)
             sleep(sleep_time)
     
     def run_update(self, args, cfg, board, db):
