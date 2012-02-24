@@ -89,7 +89,6 @@ class Daemon(object):
         # use default tags from file
         if cfg.default_tags:
             default_tags = [x.strip() for x in re.sub(' +',' ',cfg.default_tags).split(' ')]
-            print(default_tags)
             if not args.tags: args.tags = []
             args.tags = args.tags + list(set(default_tags) - set(args.tags))
 
