@@ -102,7 +102,7 @@ class Daemon(object):
     def abort(self):
         self._stop = True
         for k in self.abort_list.keys():
-            self.abort_list[k].abort()
+            self.abort_list[k].stop()
             
     def registerClassSignal(self, cls):
         self.abort_list[cls.__class__.__name__] = cls
