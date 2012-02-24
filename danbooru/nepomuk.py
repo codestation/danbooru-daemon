@@ -26,6 +26,7 @@ from PyQt4.QtCore import QObject, QCoreApplication, QEventLoop, QTimer
 class NepomukTask(object):
     
     def stop(self):
+        logging.debug("Stopping nepomuk job")
         self.job.cancelJob()
     
     def _initNepomuk(self):            

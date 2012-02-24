@@ -135,12 +135,20 @@ class Database(object):
             row = self.conn.execute('SELECT * from post WHERE board_id=%i AND md5 = ?' % host['id'], [os.path.splitext(file)[0]])
             data = row.fetchone()
             if data:
-                logging.debug("Using post from %s" % host['name'])
+                #logging.debug("Using post from %s" % host['name'])
                 self.conn.row_factory = None
                 row = self.conn.execute('SELECT tag_name FROM post_tag WHERE post_id =:id AND board_id=%i' % host['id'], data)
                 data['tags'] = [x[0] for x in row]
                 data['rating'] = self.ratings[data['rating']]
                 return data
+            
+    def fileExists(self, md5):
+        row = self.conn.execute('SELECT md5 FROM post WHERE md5=? LIMIT 1', [md5])
+        data = row.fetchone()
+        if data:
+            return True
+        else:
+            return False
                 
     def getFiles(self, limit, offset):
         if self.board_id:

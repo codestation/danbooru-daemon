@@ -33,6 +33,7 @@ class Downloader(object):
         self.path = path
         
     def stop(self):
+        logging.debug("Stopping download job")
         self._stop = True
         
     def _calculateMD5(self, name):
@@ -62,10 +63,10 @@ class Downloader(object):
             md5 = self._calculateMD5(filename)
             if md5:
                 if md5 == dl['md5']:
-                    logging.debug("%s already exists, skipping" % filename)
+                    #logging.debug("%s already exists, skipping" % filename)
                     continue
                 else:
-                    logging.warning("%s md5sum doesn't match, re-downloading")
+                    logging.warning("%s md5sum doesn't match, re-downloading" % filename)
                         
             try:
                 local_file = open(filename, 'wb')
@@ -74,7 +75,7 @@ class Downloader(object):
                 continue
 
             retries = 0
-            while retries < 3:
+            while not self._stop and retries < 3:
                 try:
                     remote_file = urlopen(dl['file_url'])
                     shutil.copyfileobj(remote_file, local_file)
