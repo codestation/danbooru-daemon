@@ -54,6 +54,12 @@ class Downloader(object):
             if self._stop: break
             
             base = basename(urlsplit(dl['file_url'])[2])
+
+            #fix extension to jpg
+            if splitext(base)[1] == ".jpeg":
+                base = "%s.jpg" % splitext(base)[0]
+
+            base = splitext(base)[1]
             subdir = dl['md5'][0]
             filename = join(self.path, subdir, dl['md5'] + splitext(base)[1])
             if nohash and isfile(filename):
