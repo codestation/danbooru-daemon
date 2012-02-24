@@ -17,7 +17,7 @@
 
 import os
 import sqlite3
-import logging
+#import logging
 
 class Database(object):
     

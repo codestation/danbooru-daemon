@@ -19,7 +19,11 @@ import sys
 import signal
 import argparse
 import logging
+import shutil
+import re
 from time import sleep
+from os import listdir
+from os.path import join, isdir, isfile, splitext
 from danbooru.api import Api
 from danbooru.database import Database
 from danbooru.settings import Settings
@@ -84,15 +88,16 @@ class Daemon(object):
     def parseTags(self, args, cfg):
         # use default tags from file
         if cfg.default_tags:
-            default_tags = [x.strip() for x in cfg.default_tags.split(',')]
+            default_tags = [x.strip() for x in re.sub(' +',' ',cfg.default_tags).split(' ')]
+            print(default_tags)
             if not args.tags: args.tags = []
             args.tags = args.tags + list(set(default_tags) - set(args.tags))
-            
+
         if cfg.blacklist_tags:
-            blacklist_tags = [x.strip() for x in cfg.blacklist_tags.split(',')]
+            blacklist_tags = [x.strip() for x in re.sub(' +',' ',cfg.blacklist_tags).split(' ')]
             if not args.blacklist: args.blacklist = []
             args.blacklist = args.blacklist + list(set(blacklist_tags) - set(args.blacklist))
-            
+
         # cut down the tag list if it have too much items
         max_tags_number = cfg.max_tags
         if args.tags and len(args.tags) > max_tags_number:
@@ -149,6 +154,8 @@ class Daemon(object):
         elif args.action == "tags":            
             board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_tags(args, db, board)
+        elif args.action == "cleanup":
+            self.cleanup(cfg, db, cfg.download_path)
             
     def run_daemon(self, args, db):
         cfg = self.readConfig(args.config, "default", ['fetch_from', ('fetch_interval', int)], [])
@@ -166,16 +173,16 @@ class Daemon(object):
 
         while not self._stop:
             for section in sections:
-                if self._stop: break
+                if self._stop: return
                 cfg = self.readConfig(args.config, section, self.config_required, self.config_optional)
                 db.setHost(cfg.host)                          
                 board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
                 logging.debug("Run upload mode for %s" % section)
                 self.run_update(args, cfg, board, db)
-                if self._stop: break
+                if self._stop: return
                 logging.debug("Run download mode for %s" % section)
                 self.run_download(cfg, db)
-                if self._stop: break
+                if self._stop: return
                 #logging.debug("Run nepomuk mode for %s" % section)
                 #self.run_nepomuk(cfg, db)
                 #if self._abort: break
@@ -251,6 +258,21 @@ class Daemon(object):
                 logging.debug('Next fetch id: %i' % last_id)
             else:
                 break
+            
+    def clean_loop(self, directory, dest, db):
+        for name in listdir(directory):
+            if self._stop: break
+            full_path = join(directory, name)
+            if isdir(full_path):
+                self.clean_loop(full_path, dest, db)
+            elif isfile(full_path):
+                md5 = splitext(name)[0]
+                if not db.fileExists(md5):
+                    logging.debug('%s isn\'t in database' % name)
+                    shutil.move(full_path, join(dest, name))
+            
+    def cleanup(self, cfg, db, dest):
+        self.clean_loop(cfg.download_path, dest, db)
 
 if __name__ == '__main__':
     Daemon().main()
