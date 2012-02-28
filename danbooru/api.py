@@ -100,10 +100,10 @@ class Api(object):
                     logging.debug("%i posts filtered by the blacklist" % post_count)
 
             return posts
-        except URLError as e:
-            print('\n>>> Error %s' % e.reason)
         except HTTPError as e:
-            print('\n>>> Error %i: %s' % (e.code, e.msg))
+            print('>>> Error %i: %s' % (e.code, e.msg))
+        except URLError as e:
+            print('>>> Error %s' % e.args)
         return []
 
     def tagList(self, name):
@@ -114,8 +114,8 @@ class Api(object):
             results = response.read().decode('utf8')
             tags = json.loads(results)
             return tags
-        except URLError as e:
-            print('\n>>> Error %i: %s' % (e.code, e.msg))
         except HTTPError as e:
-            print('\n>>> Error %i: %s' % (e.code, e.msg))
+            print('>>> Error %i: %s' % (e.code, e.msg))
+        except URLError as e:
+            print('>>> Error %i: %s' % e.args)
         return []
