@@ -139,7 +139,7 @@ class Daemon(object):
         signal.signal(signal.SIGINT, self.signalHandler)
         
         db = Database(cfg.dbname)
-        db.setHost(cfg.host)
+        db.setHost(cfg.host, args.section)
         
         if args.action == "daemon":
             self.run_daemon(args, db)
@@ -174,7 +174,7 @@ class Daemon(object):
             for section in sections:
                 if self._stop: return
                 cfg = self.readConfig(args.config, section, self.config_required, self.config_optional)
-                db.setHost(cfg.host)                          
+                db.setHost(cfg.host, section)                          
                 board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
                 logging.debug("Run upload mode for %s" % section)
                 self.run_update(args, cfg, board, db)
