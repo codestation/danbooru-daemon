@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS "main"."board" (
     "id" INTEGER PRIMARY KEY NOT NULL,
-    "name" TEXT UNIQUE NOT NULL
+    "name" TEXT UNIQUE NOT NULL,
+    "alias" TEXT UNIQUE
 );
 CREATE TABLE IF NOT EXISTS "main"."post" (
     "id" INTEGER NOT NULL,    

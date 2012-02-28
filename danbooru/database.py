@@ -52,6 +52,7 @@ class Database(object):
     def __init__(self, dbname):
         self.dbname = dbname        
         self.conn = sqlite3.connect(dbname)
+        self.board_id = None
         try:
             f = open("danbooru-db.sql")
             self.conn.executescript(f.read())
@@ -59,18 +60,37 @@ class Database(object):
         except IOError:
             pass
         
-    def getHost(self, board_id):
-        row = self.conn.execute('SELECT name FROM board WHERE id=%i' % board_id)
-        return row.fetchone()[0]
+    def dict_factory(self, cursor, row):
+        d = {}
+        for idx, col in enumerate(cursor.description):
+            d[col[0]] = row[idx]
+        return d
+    
+    def clearHost(self):
+        self.board_id = None
         
-    def setHost(self, host):
-        try:
-            self.conn.execute('INSERT INTO board (name) VALUES (?)', [host]);
-        except sqlite3.IntegrityError:
-            pass
-        rows = self.conn.execute('SELECT name, id FROM board ORDER BY id ASC')
-        self.hosts = [{'name':x[0], 'id':x[1]} for x in rows]        
-        self.board_id = [x['id'] for x in self.hosts if x['name'] == host][0]
+    def getHost(self, board_id):
+        self.conn.row_factory = self.dict_factory
+        row = self.conn.execute('SELECT name, alias FROM board WHERE id=%i' % board_id)
+        self.conn.row_factory = None
+        result = row.fetchone()
+        return result
+        
+    def setHost(self, host, alias):
+        if host:
+            try:
+                self.conn.execute('INSERT INTO board (name, alias) VALUES (?, ?)', (host, alias));
+                self.conn.commit()
+            except sqlite3.IntegrityError:
+                pass
+        self.conn.row_factory = self.dict_factory
+        rows = self.conn.execute('SELECT name, id, alias FROM board ORDER BY id ASC')
+        self.conn.row_factory = None
+        self.hosts = [x for x in rows]
+        for item in self.hosts:
+            if item['name'] == host or item['alias'] == alias:
+                self.board_id = item['id']
+                break
         
     def updatePosts(self, posts, commit=True):
         fields = ",".join("%s=:%s" % (x,x) for x in self.post_fields)
@@ -126,38 +146,95 @@ class Database(object):
             return (len(insert), len(upd))
         else:
             return (len(insert), )
-
-    def getPost(self, file):
-        def dict_factory(cursor, row):
-            d = {}
-            for idx, col in enumerate(cursor.description):
-                d[col[0]] = row[idx]
-            return d
         
+    def preparePost(self, post):
+        row = self.conn.execute('SELECT tag_name as tags FROM post_tag WHERE post_id =:id AND board_id=:board_id', post)
+        post['tags'] = [x[0] for x in row]
+        post['rating'] = self.ratings[post['rating']]
+        host = self.getHost(post['board_id'])
+        post['board_url'] = host['name']
+        post['board_alias'] = host['alias']
+        return post
+
+    def getPost(self, file):        
         for host in self.hosts:
-            self.conn.row_factory = dict_factory
+            self.conn.row_factory = self.dict_factory
             row = self.conn.execute('SELECT * from post WHERE board_id=%i AND md5 = ?' % host['id'], [os.path.splitext(file)[0]])
+            self.conn.row_factory = None
             data = row.fetchone()
             if data:
-                #logging.debug("Using post from %s" % host['name'])
-                self.conn.row_factory = None
-                row = self.conn.execute('SELECT tag_name FROM post_tag WHERE post_id =:id AND board_id=%i' % host['id'], data)
-                data['tags'] = [x[0] for x in row]
-                data['rating'] = self.ratings[data['rating']]
-                data['board_url'] = self.getHost(data['board_id'])
-                return data
+                return self.preparePost(data)
             
     def fileExists(self, md5):
         row = self.conn.execute('SELECT md5 FROM post WHERE md5=? LIMIT 1', [md5])
         data = row.fetchone()
-        if data:
-            return True
+        return bool(data)
+        
+    def getORPosts(self, tags, limit):        
+        placeholders = ', '.join('?' for unused in tags)
+        sql = ('SELECT * FROM post WHERE id IN (SELECT DISTINCT post_id from ' +
+              'post_tag WHERE tag_name IN (%s)) GROUP BY md5 ORDER BY id DESC')
+        if limit > 0:
+            sql += ' LIMIT %i' % limit            
+        self.conn.row_factory = self.dict_factory
+        rows = self.conn.execute(sql % placeholders, tags)
+        self.conn.row_factory = None
+        return [x for x in rows]
+    
+    def dictToQuery(self, items, first="AND"):
+        sql = ""
+        if items:
+            if items.get("width"):                
+                sql += "width %s %i" % (items['width_type'], items['width'])
+            if items.get("height"):
+                if sql: sql = " AND " + sql
+                sql += "height %s %i" % (items['height_type'], items['height'])
+            if items.get("rating"):
+                for char, name in self.ratings.items():
+                    if name == items['rating']:
+                        if sql: sql = " AND " + sql
+                        sql += "rating = '%s'" % char
+                        break
+            if sql:
+                sql = " %s %s" % (first, sql)
+        return sql
+    
+    def getANDPosts(self, tags, limit=100, extra_items=None):
+        self.conn.row_factory = self.dict_factory        
+        placeholders = ', '.join('?' for unused in tags)        
+        extra_sql = self.dictToQuery(extra_items)
+        if self.board_id:            
+            sql = ("SELECT * FROM post WHERE board_id=%i AND id IN (SELECT post_id FROM post_tag " + 
+                   "WHERE board_id=%i AND tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " + 
+                   "%s GROUP BY md5 ORDER BY id DESC")
         else:
-            return False
-                
+            sql = ("SELECT * FROM post WHERE id IN (SELECT post_id FROM post_tag " + 
+                   "WHERE tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " + 
+                   "%s GROUP BY md5 ORDER BY id DESC")
+        if limit > 0:
+            sql += ' LIMIT %i' % limit
+        if self.board_id:
+            rows = self.conn.execute(sql % (self.board_id, self.board_id, placeholders, len(tags), extra_sql), tags)
+        else:
+            rows = self.conn.execute(sql % (placeholders, len(tags), extra_sql), tags)
+        self.conn.row_factory = None
+        return [self.preparePost(data) for data in rows]
+    
+    def getPosts(self, limit=100, offset=0, extra_items=None):
+        self.conn.row_factory = self.dict_factory
+        if self.board_id:
+            extra_sql = self.dictToQuery(extra_items)
+            rows = self.conn.execute('SELECT * FROM post WHERE board_id=%i %s ORDER BY id DESC LIMIT ? OFFSET ?' % (self.board_id, extra_sql), (limit, offset))
+        else:
+            extra_sql = self.dictToQuery(extra_items, first="WHERE")
+            rows = self.conn.execute('SELECT * FROM post %s GROUP BY md5 ORDER BY id DESC LIMIT ? OFFSET ?' % extra_sql, (limit, offset))
+        self.conn.row_factory = None
+        return [self.preparePost(data) for data in rows]
+        
     def getFiles(self, limit, offset):
+        self.conn.row_factory = self.dict_factory
         if self.board_id:
             rows = self.conn.execute('SELECT file_url, md5 FROM post WHERE board_id=%i ORDER BY id DESC LIMIT ? OFFSET ?' % self.board_id, (limit, offset))
         else:
             rows = self.conn.execute('SELECT file_url, md5 FROM post ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))
-        return [{'file_url':x[0], 'md5':x[1]} for x in rows]
+        return [file for file in rows]
