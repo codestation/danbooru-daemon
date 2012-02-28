@@ -301,8 +301,6 @@
    </widget>
   </widget>
  </widget>
- <resources>
-  <include location="danbooru.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>
