@@ -59,24 +59,29 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.thumb = self.ThumbnailWorker(self.listWidget)
         self.thumb.makeIconSignal.connect(self.makeIcon)
 
-        user_dir = expanduser("~")
-        daemon_dir = join(user_dir, ".local/danbooru-daemon")
-        dbname = join(daemon_dir, "danbooru-db.sqlite")
-
-        self.db = Database(dbname)
-
         # Add clear button on queryBox
         self.clearButton = QtGui.QPushButton(self.queryBox)
         self.clearButton.setVisible(False)
         self.clearButton.setStyleSheet("QPushButton { border: none; padding: 0px; }")
         self.clearButton.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
-        self.clearButton.setIcon(QtGui.QIcon("edit-clear-locationbar-rtl.png"))
+        icon = QtGui.QIcon(utils.find_resource("ui/query-clear.png"))
+        self.clearButton.setIcon(icon)
         self.clearButton.clicked.connect(self.queryBox.clear)
         self.queryBox.textChanged.connect(self.updateClearButton)
         layout = QtGui.QHBoxLayout(self.queryBox)
         self.queryBox.setLayout(layout)
         layout.addStretch()
         layout.addWidget(self.clearButton)
+
+        # load user settings
+        user_dir = expanduser("~")
+        cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
+        cfg.load("default", [], {'dbname': None})
+        if not cfg.dbname:
+            daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
+            cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
+        dbname = join(daemon_dir, cfg.dbname)
+        self.db = Database(dbname)
 
     def updateClearButton(self, text):
         self.clearButton.setVisible(bool(text))
