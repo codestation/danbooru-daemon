@@ -34,18 +34,3 @@ def post_basename(post):
         return post['md5'] + ".jpg"
     else:
         return post['md5'] + splitext(base)[1]
-    
-def scale_size(size, length):
-    image_width = size[0]
-    image_height = size[1]
-    if image_width > image_height:
-        image_height = int(length * 1.0 / image_width * image_height)
-        image_width = length
-    elif image_width < image_height:
-        image_width = int(length * 1.0 / image_height * image_width)
-        image_height = length
-    else:
-        image_width = length
-        image_height = length
-    return(image_width, image_height)
-

@@ -51,7 +51,8 @@ class Daemon(object):
         
     config_optional = {
                        'default_tags': None,
-                       'blacklist_tags': None,
+                       'blacklist': None,
+                       'whitelist': None,
                         ('max_tags', int): 2,
                     }
 
@@ -65,6 +66,8 @@ class Daemon(object):
                 help='list of tags to use in search')
         parser.add_argument('-b', '--blacklist', dest='blacklist', nargs='+',
                 help='list of tags to skip in search')
+        parser.add_argument('-w', '--whitelist', dest='whitelist', nargs='+',
+                help='list of tags to always get in search')
         parser.add_argument('-a', '--action', dest='action', required=True,
                 help='set the action to perform')
         parser.add_argument('-i', '--before-id', dest='before_id', 
@@ -92,10 +95,15 @@ class Daemon(object):
             if not args.tags: args.tags = []
             args.tags = args.tags + list(set(default_tags) - set(args.tags))
 
-        if cfg.blacklist_tags:
-            blacklist_tags = [x.strip() for x in re.sub(' +',' ',cfg.blacklist_tags).split(' ')]
+        if cfg.blacklist:
+            blacklist_tags = [x.strip() for x in re.sub(' +',' ',cfg.blacklist).split(' ')]
             if not args.blacklist: args.blacklist = []
             args.blacklist = args.blacklist + list(set(blacklist_tags) - set(args.blacklist))
+
+        if cfg.whitelist:
+            whitelist_tags = [x.strip() for x in re.sub(' +',' ',cfg.whitelist).split(' ')]
+            if not args.whitelist: args.whitelist = []
+            args.whitelist = args.whitelist + list(set(whitelist_tags) - set(args.whitelist))
 
         # cut down the tag list if it have too much items
         max_tags_number = cfg.max_tags
@@ -122,7 +130,7 @@ class Daemon(object):
         if before_id:
             return int(before_id)
         else:
-            posts = board.getPostsPage(tags, None, 1, 1)
+            posts = board.getPostsPage(tags, 1, 1)
             if not posts:
                 logging.error('Error: cannot get last post id')
                 sys.exit(1)
@@ -205,10 +213,10 @@ class Daemon(object):
 
         while not self._stop:
             if cfg.fetch_mode == "id":
-                post_list = board.getPostsBefore(last_id, args.tags, args.blacklist, cfg.limit)
+                post_list = board.getPostsBefore(last_id, args.tags, cfg.limit, args.blacklist, args.whitelist)
             elif cfg.fetch_mode == "page":
-                post_list = board.getPostsPage(args.tags, args.blacklist, page, cfg.limit)
-        
+                post_list = board.getPostsPage(args.tags, page, cfg.limit, args.blacklist, args.whitelist)
+
             if post_list:
                 result = db.addPosts(post_list)
                 if len(result) > 1:
