@@ -16,7 +16,8 @@
 #   limitations under the License.
 
 import sys
-from os.path import join, dirname, expanduser
+from os import makedirs
+from os.path import join, expanduser
 from PyQt4 import QtCore, QtGui, uic
 
 from danbooru import utils
@@ -170,14 +171,16 @@ class DanbooruGUI(QtGui.QMainWindow):
         def __init__(self, ListWidget, parent=None):
             QtCore.QThread.__init__(self, parent)
             self.widget = ListWidget
+            user_path = expanduser("~")
+            self.thumbnail_dir = join(user_path, ".cache/danbooru-daemon/thumbnails")
+            makedirs(self.thumbnail_dir, exist_ok=True)
 
         def stop(self):
             self.abort = True
 
         def run(self):
             self.abort = False
-            thumbnail_dir = join(dirname(sys.argv[0]), ".danbooru-thumbnails")
-            th = utils.ThumbnailCache(thumbnail_dir)
+            th = utils.ThumbnailCache(self.thumbnail_dir)
             generator = utils.list_generator(self.widget)
             for item in generator:
                 if self.abort: break
