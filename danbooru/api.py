@@ -47,17 +47,6 @@ class Api(object):
         sha1_password = sha1data.hexdigest()
         return '&login=%s&password_hash=%s' % (self.username, sha1_password)
     
-    def _getPosts(self, tags, page, limit):
-        results = open('post.json', 'rb').read().decode('utf8')
-        posts = json.loads(results)
-        for post in posts:
-            post['tags'] = post['tags'].split(' ')
-            if not "has_comments" in post:
-                post['has_comments'] = None
-            if not "has_notes" in post:
-                post['has_notes'] = None
-        return posts
-    
     def getPostsPage(self, tags, page, limit, blacklist = None, whitelist = None):
         tags = ','.join(tags)
         url = self.host + self.post_api + '?tags=%s&page=%i&limit=%i' % (tags, page, limit) + self._loginData()
@@ -70,9 +59,6 @@ class Api(object):
     
     def getTagsBefore(self, post_id, tags, limit):
         pass  
-        #tags = ','.join(tags)      
-        #url = self.host + self.tag_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
-        #return self.getPosts(url)
         
     def getPosts(self, url, blacklist, whitelist):
         self._wait()
