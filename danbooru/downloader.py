@@ -19,23 +19,24 @@ import shutil
 import hashlib
 import logging
 from time import sleep
-from os.path import basename, isfile, join, splitext
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
+from os.path import basename, isfile, join, splitext
+
 
 class Downloader(object):
-    
+
     _total = 1
     _stop = False
 
     def __init__(self, path):
         self.path = path
-        
+
     def stop(self):
         logging.debug("Stopping download job")
         self._stop = True
-        
+
     def _calculateMD5(self, name):
         try:
             file = open(name, 'rb')

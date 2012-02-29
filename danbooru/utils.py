@@ -15,17 +15,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from os.path import join,basename, splitext
+from os.path import join, basename, splitext
 from urllib.parse import urlsplit
+
 
 def list_generator(list_widget):
     for i in range(list_widget.count()):
         yield list_widget.item(i)
-        
+
+
 def post_abspath(post):
     base = post_basename(post)
     subdir = post['md5'][0]
     return join("/home/code/danbooru", subdir, base)
+
 
 def post_basename(post):
     base = basename(urlsplit(post['file_url'])[2])

@@ -18,12 +18,13 @@
 import logging
 import configparser
 
+
 class Settings(object):
-    
-    def __init__(self, configfile):    
+
+    def __init__(self, configfile):
         self.config = configparser.ConfigParser(interpolation=None)
         self.config.read(configfile)
-        
+
     def set_value(self, key, section):
         if isinstance(key, tuple):
             if key[1] == int:
@@ -35,7 +36,7 @@ class Settings(object):
                 setattr(self, key[0], self.config.get(section, key[0]))
         else:
             setattr(self, key, self.config.get(section, key))
-    
+
     def load(self, section, required, optional):
         try:
             for key in required:
@@ -43,7 +44,7 @@ class Settings(object):
                     self.set_value(key, section)
                 except configparser.NoOptionError:
                     self.set_value(key, "default")
-                    
+
             for key in optional:
                 try:
                     self.set_value(key, section)

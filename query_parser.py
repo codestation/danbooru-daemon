@@ -17,6 +17,7 @@
 
 import re
 
+
 def parseDimension(term, dim):
     query = {}
     if term[len("%s:" % dim)] == ">":
@@ -29,11 +30,12 @@ def parseDimension(term, dim):
         query['%s_type' % dim] = "="
         query[dim] = int(term.split(":")[1])
     return query
-    
+
+
 def parseQuery(text):
     query = {}
     query['tags'] = []
-    items = re.sub(' +',' ',text).split(' ')
+    items = re.sub(' +', ' ', text).split(' ')
     try:
         for item in items:
             if item.startswith("site:"):
@@ -49,8 +51,3 @@ def parseQuery(text):
         return query
     except Exception:
         return item
-    
-def tags2links(tags):
-    tags[:] = ["<a href='%s'>%s</a>" % (tag, tag) for tag in tags]
-
-        

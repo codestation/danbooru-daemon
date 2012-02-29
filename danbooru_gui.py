@@ -6,27 +6,27 @@ import sys
 from os.path import join, dirname
 from PyQt4 import QtGui, uic
 from PyQt4.QtCore import QSize, Qt, QThread, pyqtSignal
-from PyQt4.QtGui import QListWidgetItem, QIcon, QPixmap, QImage, QHBoxLayout
 
 import query_parser
 from thumbnail import ThumbnailCache
 from danbooru.database import Database
 from danbooru.utils import list_generator, post_abspath, post_basename
 
+
 class DanbooruGUI(QtGui.QMainWindow):
-    
+
     SLIDER_MULT = 16
     img = None
-    info_format = ("<table>" + 
+    info_format = ("<table>" +
                    "<tr><td align='right'><b>Width:</b></td>" +
                    "<td><a href='width:%i'>%i</a></td></tr>" +
                    "<tr><td align='right'><b>Height:</b></td>" +
                    "<td><a href='height:%i'>%i</a></td></tr>" +
                    "<tr><td align='right'><b>Tags:</b></td>" +
-                   "<td>%s</td></tr>" + 
+                   "<td>%s</td></tr>" +
                    "<tr><td align='right'><b>Rating:</b></td>" +
                    "<td><a href='rating:%s'>%s</a></td></tr>" +
-                   "<tr><td align='right'><b>Score:</b></td>" +                   
+                   "<tr><td align='right'><b>Score:</b></td>" +
                    "<td>%i</td></tr>" +
                    "<tr><td align='right'><b>From:</b></td>" +
                    "<td>%s</td></tr>" +
@@ -35,15 +35,15 @@ class DanbooruGUI(QtGui.QMainWindow):
                    "</table>"
                    )
 
-    def __init__(self):
-        super(DanbooruGUI,  self).__init__()
+    def __init__(self, parent=None):
+        super(DanbooruGUI, self).__init__(parent)
         self.ui = uic.loadUi('danbooru.ui', self)
         self.setup()
-        
+
     def setup(self):
         # UI settings
         self.listWidget.setDragEnabled(False)
-        
+
         # UI signals
         self.searchButton.clicked.connect(self.startSearch)
         self.queryBox.returnPressed.connect(self.startSearch)
@@ -52,33 +52,33 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.infoLabel.linkActivated.connect(self.tagSelected)
         # UI event overrides
         self.infoDock.resizeEvent = self.updatePreview
-        
+
         # UI data
         pixels = self.zoomSlider.value() * self.SLIDER_MULT
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
-        
+
         # Other setup
         self.thumb = self.ThumbnailWorker(self.listWidget)
         self.thumb.makeIconSignal.connect(self.makeIcon)
         self.db = Database("danbooru-db.sqlite")
-        
-        # Add clear button on queryBox        
-        self.clearButton = QtGui.QPushButton(self.queryBox)        
+
+        # Add clear button on queryBox
+        self.clearButton = QtGui.QPushButton(self.queryBox)
         self.clearButton.setVisible(False)
-        self.clearButton.setStyleSheet("QPushButton { border: none; padding: 0px; }");
+        self.clearButton.setStyleSheet("QPushButton { border: none; padding: 0px; }")
         self.clearButton.setCursor(QtGui.QCursor(Qt.ArrowCursor))
         self.clearButton.setIcon(QtGui.QIcon("edit-clear-locationbar-rtl.png"))
         self.clearButton.clicked.connect(self.queryBox.clear)
         self.queryBox.textChanged.connect(self.updateClearButton)
-        layout = QHBoxLayout(self.queryBox)
+        layout = QtGui.QHBoxLayout(self.queryBox)
         self.queryBox.setLayout(layout)
         layout.addStretch()
         layout.addWidget(self.clearButton)
-  
+
     def updateClearButton(self, text):
         self.clearButton.setVisible(bool(text))
 
-    def updatePreview(self, event=None):
+    def updatePreview(self, event=None):  # @UnusedVariable
         if self.img:
             dock_s = self.infoDock.size()
             prev_w = self.previewWidget
@@ -87,22 +87,22 @@ class DanbooruGUI(QtGui.QMainWindow):
                 height = dock_s.height() - extra
             else:
                 height = prev_w.size().width()
-            self.previewWidget.setMinimumHeight(height)            
+            self.previewWidget.setMinimumHeight(height)
             self.previewWidget.setPixmap(self.getScaledPixmap(self.img))
-        
+
     def getScaledPixmap(self, image):
-        size = self.previewWidget.size() 
+        size = self.previewWidget.size()
         if size.width() > size.height():
             width = size.height()
         else:
-            width = size.width()        
+            width = size.width()
         size = image.size()
         if size.width() < size.height():
             img = image.scaledToHeight(width, Qt.SmoothTransformation)
         else:
             img = image.scaledToWidth(width, Qt.SmoothTransformation)
-        return QPixmap.fromImage(img)
-        
+        return QtGui.QPixmap.fromImage(img)
+
     def selectionChanged(self):
         items = self.listWidget.selectedItems()
         if not items:
@@ -110,46 +110,46 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.img = None
         elif len(items) == 1:
             item = items[0]
-            self.nameLabel.setText("1 selected item")            
+            self.nameLabel.setText("1 selected item")
             post = item.data(Qt.UserRole)
             full_path = post_abspath(post)
-            self.img = QImage(full_path)
-            self.updatePreview()            
-            tags= ["<a href='%s'>%s</a>" % (tag, tag) for tag in post['tags']]
+            self.img = QtGui.QImage(full_path)
+            self.updatePreview()
+            tags = ["<a href='%s'>%s</a>" % (tag, tag) for tag in post['tags']]
             tags = " ".join(tags)
-            self.infoLabel.setText(self.info_format % 
+            self.infoLabel.setText(self.info_format %
                 (post['width'], post['width'], post['height'], post['height'],
                  tags, post['rating'], post['rating'], post['score'],
                  post['board_url'], post['id']))
-        else:            
+        else:
             self.nameLabel.setText("%i selected items" % len(items))
             self.img = None
-            
+
     def tagSelected(self, tag):
         self.queryBox.setText(self.queryBox.text() + " %s" % tag)
-        self.startSearch() 
-        
+        self.startSearch()
+
     def itemClicked(self, item):
         post = item.data(Qt.UserRole)
         full_path = post_abspath(post)
-        self.previewWidget.setPixmap(QPixmap(full_path))
-        
+        self.previewWidget.setPixmap(QtGui.QPixmap(full_path))
+
     def makeIcon(self, item, image):
         value = self.zoomSlider.value() * self.SLIDER_MULT
-        pixmap = QPixmap(value, value)
+        pixmap = QtGui.QPixmap(value, value)
         pixmap.convertFromImage(image)
-        icon = QIcon(pixmap)
+        icon = QtGui.QIcon(pixmap)
         item.setIcon(icon)
-        
+
     class ThumbnailWorker(QThread):
-        
-        makeIconSignal = pyqtSignal(QListWidgetItem, QImage)
+
+        makeIconSignal = pyqtSignal(QtGui.QListWidgetItem, QtGui.QImage)
         abort = False
-        
+
         def __init__(self, ListWidget, parent=None):
-            QThread.__init__(self)
+            super(self.ThumbnailWorker, self).__init__(parent)
             self.widget = ListWidget
-            
+
         def stop(self):
             self.abort = True
 
@@ -174,9 +174,9 @@ class DanbooruGUI(QtGui.QMainWindow):
             item.setSizeHint(QSize(value + 32,value + 32))
         
     def addItem(self, post):        
-        item = QListWidgetItem()
+        item = QtGui.QListWidgetItem()
         item.setText(post_basename(post))
-        item.setIcon(QIcon().fromTheme("image-x-generic"))
+        item.setIcon(QtGui.QIcon().fromTheme("image-x-generic"))
         item.setData(Qt.UserRole, post)
         item.setTextAlignment(Qt.AlignHCenter | Qt.AlignBottom)
         value = self.zoomSlider.value() * self.SLIDER_MULT

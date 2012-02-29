@@ -17,12 +17,12 @@
 
 import os
 import sqlite3
-#import logging
+
 
 class Database(object):
-    
+
     ratings = {'s': 'safe', 'q': 'questionable', 'e': 'explicit'}
-    
+
     post_fields = [
                  'author',
                  'change',
@@ -31,8 +31,8 @@ class Database(object):
                  'file_size',
                  'file_url',
                  'has_children',
-                 'has_comments',# !konachan
-                 'has_notes',# !konachan
+                 'has_comments',  # !konachan
+                 'has_notes',  # !konachan
                  'height',
                  'md5',
                  'parent_id',
@@ -43,14 +43,14 @@ class Database(object):
                  'sample_height',
                  'sample_url',
                  'sample_width',
-                 'score',                 
+                 'score',
                  'source',
                  'status',
                  'width'
                 ]
 
     def __init__(self, dbname):
-        self.dbname = dbname        
+        self.dbname = dbname
         self.conn = sqlite3.connect(dbname)
         self.board_id = None
         try:
@@ -59,27 +59,27 @@ class Database(object):
             self.conn.commit()
         except IOError:
             pass
-        
+
     def dict_factory(self, cursor, row):
         d = {}
         for idx, col in enumerate(cursor.description):
             d[col[0]] = row[idx]
         return d
-    
+
     def clearHost(self):
         self.board_id = None
-        
+
     def getHost(self, board_id):
         self.conn.row_factory = self.dict_factory
         row = self.conn.execute('SELECT name, alias FROM board WHERE id=%i' % board_id)
         self.conn.row_factory = None
         result = row.fetchone()
         return result
-        
+
     def setHost(self, host, alias):
         if host:
             try:
-                self.conn.execute('INSERT INTO board (name, alias) VALUES (?, ?)', (host, alias));
+                self.conn.execute('INSERT INTO board (name, alias) VALUES (?, ?)', (host, alias))
                 self.conn.commit()
             except sqlite3.IntegrityError:
                 pass
@@ -91,30 +91,30 @@ class Database(object):
             if item['name'] == host or item['alias'] == alias:
                 self.board_id = item['id']
                 break
-        
+
     def updatePosts(self, posts, commit=True):
-        fields = ",".join("%s=:%s" % (x,x) for x in self.post_fields)
+        fields = ",".join("%s=:%s" % (x, x) for x in self.post_fields)
         self.conn.executemany('UPDATE post SET %s WHERE id=:id AND board_id=%i' % (fields, self.board_id), posts)
-        if commit:            
+        if commit:
             self.conn.commit()
-        
+
     def insertPosts(self, posts, commit=True):
         fields = ",".join(self.post_fields)
         values = ",".join(":%s" % x for x in self.post_fields)
         self.conn.executemany('INSERT INTO post (id,board_id,%s) VALUES(:id,%i,%s)' % (fields, self.board_id, values), posts)
         if commit:
             self.conn.commit()
-            
+
     def deleteTags(self, post_id, tags, commit=True):
         self.conn.executemany('DELETE FROM post_tag WHERE post_id=%i AND board_id=%i AND tag_name=?' % (post_id, self.board_id), tags)
         if commit:
             self.conn.commit()
-            
+
     def insertTags(self, post_id, tags, commit=True):
         self.conn.executemany('INSERT INTO post_tag (post_id, board_id, tag_name) VALUES (%i, %i, ?)' % (post_id, self.board_id), [(x,) for x in tags])
         if commit:
             self.conn.commit()
-            
+
     def addTags(self, posts, delete=True, commit=True):
         for post in posts:
             rows = self.conn.execute('SELECT tag_name, post_id FROM post_tag WHERE post_id=:id AND board_id=%i' % self.board_id, post)
@@ -128,7 +128,7 @@ class Database(object):
                     self.deleteTags(post['id'], dele, commit)
         if commit:
             self.conn.commit()
-            
+
     def addPosts(self, posts, update=True):
         id_list = [x['id'] for x in posts]
         placeholders = ', '.join('?' for unused in id_list)
@@ -137,7 +137,7 @@ class Database(object):
         if update:
             upd = [x for x in posts if x['id'] in exists]
             self.updatePosts(upd, commit=False)
-            
+
         insert = [x for x in posts if not x['id'] in exists]
         self.insertPosts(insert, commit=False)
         self.addTags(posts, commit=False)
@@ -146,7 +146,7 @@ class Database(object):
             return (len(insert), len(upd))
         else:
             return (len(insert), )
-        
+
     def preparePost(self, post):
         row = self.conn.execute('SELECT tag_name as tags FROM post_tag WHERE post_id =:id AND board_id=:board_id', post)
         post['tags'] = [x[0] for x in row]
@@ -156,7 +156,7 @@ class Database(object):
         post['board_alias'] = host['alias']
         return post
 
-    def getPost(self, file):        
+    def getPost(self, file):
         for host in self.hosts:
             self.conn.row_factory = self.dict_factory
             row = self.conn.execute('SELECT * from post WHERE board_id=%i AND md5 = ?' % host['id'], [os.path.splitext(file)[0]])
@@ -164,27 +164,27 @@ class Database(object):
             data = row.fetchone()
             if data:
                 return self.preparePost(data)
-            
+
     def fileExists(self, md5):
         row = self.conn.execute('SELECT md5 FROM post WHERE md5=? LIMIT 1', [md5])
         data = row.fetchone()
         return bool(data)
-        
-    def getORPosts(self, tags, limit):        
+
+    def getORPosts(self, tags, limit):
         placeholders = ', '.join('?' for unused in tags)
         sql = ('SELECT * FROM post WHERE id IN (SELECT DISTINCT post_id from ' +
               'post_tag WHERE tag_name IN (%s)) GROUP BY md5 ORDER BY id DESC')
         if limit > 0:
-            sql += ' LIMIT %i' % limit            
+            sql += ' LIMIT %i' % limit
         self.conn.row_factory = self.dict_factory
         rows = self.conn.execute(sql % placeholders, tags)
         self.conn.row_factory = None
         return [x for x in rows]
-    
+
     def dictToQuery(self, items, first="AND"):
         sql = ""
         if items:
-            if items.get("width"):                
+            if items.get("width"):
                 sql += "width %s %i" % (items['width_type'], items['width'])
             if items.get("height"):
                 if sql: sql = " AND " + sql

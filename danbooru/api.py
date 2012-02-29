@@ -23,6 +23,7 @@ from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 from time import sleep, time, gmtime, strftime
 
+
 class Api(object):
 
     post_api = '/post/index.json'
@@ -36,7 +37,7 @@ class Api(object):
         self.username = username
         self.password = password
         self.salt = salt
-        
+
     def _wait(self):
         self._delta_time = time() - self._delta_time
         if self._delta_time < self.WAIT_TIME:
@@ -46,20 +47,23 @@ class Api(object):
         sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
         sha1_password = sha1data.hexdigest()
         return '&login=%s&password_hash=%s' % (self.username, sha1_password)
-    
-    def getPostsPage(self, tags, page, limit, blacklist = None, whitelist = None):
+
+    def getPostsPage(self, tags, page, limit, blacklist=None, whitelist=None):
         tags = ','.join(tags)
-        url = self.host + self.post_api + '?tags=%s&page=%i&limit=%i' % (tags, page, limit) + self._loginData()
+        url = "%s%s?tags=%s&page=%i&limit=%i" % (self.host, self.post_api,
+              tags, page, limit) + self._loginData()
         return self.getPosts(url, blacklist, whitelist)
-        
-    def getPostsBefore(self, post_id, tags, limit, blacklist = None, whitelist = None):
-        tags = ','.join(tags)     
-        url = self.host + self.post_api + '?before_id=%i&tags=%s&limit=%i' % (post_id, tags, limit) + self._loginData()
+
+    def getPostsBefore(self, post_id, tags, limit, blacklist=None,
+                       whitelist=None):
+        tags = ','.join(tags)
+        url = "%s%s?before_id=%i&tags=%s&limit=%i" % (self.host, self.post_api,
+              post_id, tags, limit) + self._loginData()
         return self.getPosts(url, blacklist, whitelist)
-    
+
     def getTagsBefore(self, post_id, tags, limit):
-        pass  
-        
+        pass
+
     def getPosts(self, url, blacklist, whitelist):
         self._wait()
         try:
@@ -68,14 +72,14 @@ class Api(object):
             posts = json.loads(results)
             for post in posts:
                 #remove all extra spaces
-                post['tags'] = re.sub(' +',' ',post['tags']).split(' ')
+                post['tags'] = re.sub(' +', ' ', post['tags']).split(' ')
                 #remove duplicates
                 post['tags'] = list(set(post['tags']))
                 if not "has_comments" in post:
                     post['has_comments'] = None
                 if not "has_notes" in post:
                     post['has_notes'] = None
-                if "created_at" in post and isinstance(post['created_at'], dict):                    
+                if "created_at" in post and isinstance(post['created_at'], dict):
                     post['created_at'] = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime(post['created_at']['s']))
 
             if blacklist:

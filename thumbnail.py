@@ -17,34 +17,30 @@
 
 from os import makedirs
 from os.path import join, basename, splitext, exists
-from PyQt4.QtCore import QSize
-from PyQt4.QtGui import QImageReader, QPixmap, QImage
+from PyQt4 import QtCore, QtGui
+
 
 class ThumbnailCache(object):
-    
+
     MAX_SIZE = 256
 
     def __init__(self, path):
         self.path = path
         makedirs(path, exist_ok=True)
-        
-    def savePixmap(self, pixmap, name):
-        pixmap = QPixmap()
-        pixmap.save(str, format="png")
-        
+
     def getThumbnail(self, path):
         if exists(path):
             base = splitext(basename(path))[0]
-            image = QImage()
+            image = QtGui.QImage()
             if image.load(join(self.path, base + ".png"), format="png"):
                 return image
             else:
                 image = self.scaleImage(path, self.MAX_SIZE)
                 image.save(join(self.path, base + ".png"), format="png")
                 return image
-        
+
     def scaleImage(self, path, length):
-        image_reader = QImageReader(path)
+        image_reader = QtGui.QImageReader(path)
         image_width = image_reader.size().width()
         image_height = image_reader.size().height()
         if image_width > image_height:
@@ -56,5 +52,5 @@ class ThumbnailCache(object):
         else:
             image_width = length
             image_height = length
-        image_reader.setScaledSize(QSize(image_width, image_height))
-        return QImage(image_reader.read())
+        image_reader.setScaledSize(QtCore.QSize(image_width, image_height))
+        return QtGui.QImage(image_reader.read())

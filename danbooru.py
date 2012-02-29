@@ -29,12 +29,12 @@ from danbooru.database import Database
 from danbooru.settings import Settings
 from danbooru.downloader import Downloader
 
+
 class Daemon(object):
-    
+
     _stop = False
-    
     abort_list = {}
-    
+
     config_required = [
                        'host',
                        'username',
@@ -48,7 +48,7 @@ class Daemon(object):
                        'fetch_mode',
                        ('skip_file_check', bool),
                        ]
-        
+
     config_optional = {
                        'default_tags': None,
                        'blacklist': None,
@@ -70,16 +70,16 @@ class Daemon(object):
                 help='list of tags to always get in search')
         parser.add_argument('-a', '--action', dest='action', required=True,
                 help='set the action to perform')
-        parser.add_argument('-i', '--before-id', dest='before_id', 
+        parser.add_argument('-i', '--before-id', dest='before_id',
                 help='search using this id as starting point')
-        
+
         return parser.parse_args()
-    
+
     def readConfig(self, config, section, required_fields, optional_fields):
-        cfg = Settings(config)        
+        cfg = Settings(config)
         if not cfg.load(section, required_fields, optional_fields):
             sys.exit(1)
-        
+
         if "log_level" in required_fields:
             numeric_level = getattr(logging, cfg.log_level.upper(), None)
             if not isinstance(numeric_level, int):
@@ -87,11 +87,11 @@ class Daemon(object):
                 sys.exit(1)
             cfg.log_level = numeric_level
         return cfg
-    
+
     def parseTags(self, args, cfg):
         # use default tags from file
         if cfg.default_tags:
-            default_tags = [x.strip() for x in re.sub(' +',' ',cfg.default_tags).split(' ')]
+            default_tags = [x.strip() for x in re.sub(' +', ' ', cfg.default_tags).split(' ')]
             if not args.tags: args.tags = []
             args.tags = args.tags + list(set(default_tags) - set(args.tags))
 
@@ -122,10 +122,10 @@ class Daemon(object):
     def unregisterClassSignal(self, cls):
         del self.abort_list[cls.__class__.__name__]
             
-    def signalHandler(self, signal, frame):
+    def signalHandler(self, signal, frame): #@UnusedVariable
         logging.info('Ctrl+C detected, shutting down...')
         self.abort()
-        
+
     def getLastId(self, tags, board, before_id=None):
         if before_id:
             return int(before_id)
