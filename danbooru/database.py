@@ -188,29 +188,31 @@ class Database(object):
             if items.get("width"):
                 sql += "width %s %i" % (items['width_type'], items['width'])
             if items.get("height"):
-                if sql: sql = " AND " + sql
+                if sql:
+                    sql += " AND "
                 sql += "height %s %i" % (items['height_type'], items['height'])
             if items.get("rating"):
                 for char, name in self.ratings.items():
                     if name == items['rating']:
-                        if sql: sql = " AND " + sql
+                        if sql:
+                            sql += " AND "
                         sql += "rating = '%s'" % char
                         break
             if sql:
                 sql = " %s %s" % (first, sql)
         return sql
-    
+
     def getANDPosts(self, tags, limit=100, extra_items=None):
-        self.conn.row_factory = self.dict_factory        
-        placeholders = ', '.join('?' for unused in tags)        
+        self.conn.row_factory = self.dict_factory
+        placeholders = ', '.join('?' for unused in tags)
         extra_sql = self.dictToQuery(extra_items)
-        if self.board_id:            
-            sql = ("SELECT * FROM post WHERE board_id=%i AND id IN (SELECT post_id FROM post_tag " + 
-                   "WHERE board_id=%i AND tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " + 
+        if self.board_id:
+            sql = ("SELECT * FROM post WHERE board_id=%i AND id IN (SELECT post_id FROM post_tag " +
+                   "WHERE board_id=%i AND tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " +
                    "%s GROUP BY md5 ORDER BY id DESC")
         else:
-            sql = ("SELECT * FROM post WHERE id IN (SELECT post_id FROM post_tag " + 
-                   "WHERE tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " + 
+            sql = ("SELECT * FROM post WHERE id IN (SELECT post_id FROM post_tag " +
+                   "WHERE tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " +
                    "%s GROUP BY md5 ORDER BY id DESC")
         if limit > 0:
             sql += ' LIMIT %i' % limit
@@ -220,7 +222,7 @@ class Database(object):
             rows = self.conn.execute(sql % (placeholders, len(tags), extra_sql), tags)
         self.conn.row_factory = None
         return [self.preparePost(data) for data in rows]
-    
+
     def getPosts(self, limit=100, offset=0, extra_items=None):
         self.conn.row_factory = self.dict_factory
         if self.board_id:
@@ -231,7 +233,7 @@ class Database(object):
             rows = self.conn.execute('SELECT * FROM post %s GROUP BY md5 ORDER BY id DESC LIMIT ? OFFSET ?' % extra_sql, (limit, offset))
         self.conn.row_factory = None
         return [self.preparePost(data) for data in rows]
-        
+
     def getFiles(self, limit, offset):
         self.conn.row_factory = self.dict_factory
         if self.board_id:
