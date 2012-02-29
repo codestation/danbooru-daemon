@@ -57,7 +57,7 @@ class NepomukJob(QtCore.QObject):
     _stop = False
 
     def __init__(self, parent=None):
-        super(NepomukJob, self).__init__(parent)
+        QtCore.QObject.__init__(self, parent)
 
     def setDirData(self, path, db):
         self.start_path = path

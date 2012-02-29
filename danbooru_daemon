@@ -22,8 +22,8 @@ import logging
 import shutil
 import re
 from time import sleep
-from os import listdir
-from os.path import join, isdir, isfile, splitext
+from os import listdir, makedirs
+from os.path import join, isdir, isfile, splitext, expanduser
 from danbooru.api import Api
 from danbooru.database import Database
 from danbooru.settings import Settings
@@ -40,7 +40,6 @@ class Daemon(object):
                        'username',
                        'password',
                        'salt',
-                       'dbname',
                        ('limit', int),
                        'download_path',
                        'log_level',
@@ -53,12 +52,13 @@ class Daemon(object):
                        'default_tags': None,
                        'blacklist': None,
                        'whitelist': None,
+                       'dbname': None,
                         ('max_tags', int): 2,
                     }
 
     def parseArgs(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-c', '--config', dest='config', default='config.cfg',
+        parser.add_argument('-c', '--config', dest='config',
                 help='use the indicated config file')
         parser.add_argument('-s', '--section', dest='section', default='danbooru',
                 help='select the section from the config file')
@@ -137,7 +137,12 @@ class Daemon(object):
             return posts[0]['id'] + 1      
 
     def main(self):
+        user_dir = expanduser("~")
         args = self.parseArgs()
+
+        if not args.config:
+            args.config = join(user_dir, ".danbooru-daemon.cfg")
+
         cfg = self.readConfig(args.config, args.section, self.config_required, self.config_optional)
 
         logging.basicConfig(level=cfg.log_level, filename=cfg.log_file,
@@ -145,7 +150,12 @@ class Daemon(object):
                             datefmt='%I:%M:%S %p')
         self.parseTags(args, cfg)
         signal.signal(signal.SIGINT, self.signalHandler)
-        
+
+        if not cfg.dbname:            
+            daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
+            makedirs(daemon_dir, exist_ok=True)
+            cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
+    
         db = Database(cfg.dbname)
         db.setHost(cfg.host, args.section)
         

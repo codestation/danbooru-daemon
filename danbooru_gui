@@ -3,11 +3,12 @@
 
 
 import sys
-from os.path import join, dirname
+from os.path import join, dirname, expanduser
 from PyQt4 import QtCore, QtGui, uic
 
 from danbooru import utils
 from danbooru.database import Database
+from danbooru.settings import Settings
 
 
 class DanbooruGUI(QtGui.QMainWindow):
@@ -33,8 +34,8 @@ class DanbooruGUI(QtGui.QMainWindow):
                    )
 
     def __init__(self, parent=None):
-        super(DanbooruGUI, self).__init__(parent)
-        self.ui = uic.loadUi('danbooru.ui', self)
+        QtGui.QMainWindow.__init__(self, parent)
+        self.ui = uic.loadUi(utils.find_resource("ui/danbooru.ui"), self)
         self.setup()
 
     def setup(self):
@@ -57,7 +58,12 @@ class DanbooruGUI(QtGui.QMainWindow):
         # Other setup
         self.thumb = self.ThumbnailWorker(self.listWidget)
         self.thumb.makeIconSignal.connect(self.makeIcon)
-        self.db = Database("danbooru-db.sqlite")
+
+        user_dir = expanduser("~")
+        daemon_dir = join(user_dir, ".local/danbooru-daemon")
+        dbname = join(daemon_dir, "danbooru-db.sqlite")
+
+        self.db = Database(dbname)
 
         # Add clear button on queryBox
         self.clearButton = QtGui.QPushButton(self.queryBox)
@@ -144,7 +150,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         abort = False
 
         def __init__(self, ListWidget, parent=None):
-            super(self.ThumbnailWorker, self).__init__(parent)
+            QtCore.QThread.__init__(self, parent)
             self.widget = ListWidget
 
         def stop(self):

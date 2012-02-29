@@ -17,6 +17,7 @@
 
 import os
 import sqlite3
+from danbooru import utils
 
 
 class Database(object):
@@ -54,7 +55,7 @@ class Database(object):
         self.conn = sqlite3.connect(dbname)
         self.board_id = None
         try:
-            f = open("danbooru-db.sql")
+            f = open(utils.find_resource("data/danbooru-db.sql"))
             self.conn.executescript(f.read())
             self.conn.commit()
         except IOError:

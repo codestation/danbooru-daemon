@@ -15,10 +15,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import re
+import danbooru
 from os import makedirs
-from urllib.parse import urlsplit
-from os.path import join, basename, splitext, exists
 from PyQt4 import QtCore, QtGui
+from urllib.parse import urlsplit
+from os.path import basename, splitext, exists, join, dirname, abspath
 
 
 class ThumbnailCache(object):
@@ -76,6 +78,7 @@ def post_basename(post):
     else:
         return post['md5'] + splitext(base)[1]
 
+
 def parseDimension(term, dim):
     query = {}
     if term[len("%s:" % dim)] == ">":
@@ -109,3 +112,14 @@ def parseQuery(text):
         return query
     except Exception:
         return item
+
+
+def find_resource(filename):
+    base_path = [".", dirname(abspath(danbooru.__file__)),
+                 "/usr/local/share/danbooru-daemon",
+                 "/usr/share/danbooru-daemon"]
+    for path in base_path:
+        full_path = join(path, filename)
+        if exists(full_path):
+            return full_path
+    raise Exception("%s cannot be found." % filename)
