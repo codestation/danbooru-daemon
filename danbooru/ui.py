@@ -86,3 +86,16 @@ class ThumbnailWorker(QtCore.QThread):
             full_path = utils.post_abspath(post)
             image = th.getThumbnail(full_path)
             self.makeIconSignal.emit(item, image)
+
+
+def getScaledPixmap(image, size):
+    if size.width() > size.height():
+        width = size.height()
+    else:
+        width = size.width()
+    size = image.size()
+    if size.width() < size.height():
+        img = image.scaledToHeight(width, QtCore.Qt.SmoothTransformation)
+    else:
+        img = image.scaledToWidth(width, QtCore.Qt.SmoothTransformation)
+    return QtGui.QPixmap.fromImage(img)

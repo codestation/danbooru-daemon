@@ -111,20 +111,9 @@ class DanbooruGUI(QtGui.QMainWindow):
             else:
                 height = prev_w.size().width()
             self.previewWidget.setMinimumHeight(height)
-            self.previewWidget.setPixmap(self.getScaledPixmap(self.img))
 
-    def getScaledPixmap(self, image):
-        size = self.previewWidget.size()
-        if size.width() > size.height():
-            width = size.height()
-        else:
-            width = size.width()
-        size = image.size()
-        if size.width() < size.height():
-            img = image.scaledToHeight(width, QtCore.Qt.SmoothTransformation)
-        else:
-            img = image.scaledToWidth(width, QtCore.Qt.SmoothTransformation)
-        return QtGui.QPixmap.fromImage(img)
+            size = self.previewWidget.size()
+            self.previewWidget.setPixmap(ui.getScaledPixmap(self.img, size))
 
     def selectionChanged(self):
         items = self.listWidget.selectedItems()

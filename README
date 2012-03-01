@@ -1,2 +1,41 @@
-Danbooru-daemon is a daemon to download images automatically from danbooru-like
-sites and optionally tag them with Nepomuk, licensed under Apache License 2.0.
+Danbooru-daemon comprises a daemon to download images automatically from
+danbooru-like sites and an offline browser GUI to search the downloaded
+images by tags and other fields, licensed under Apache License 2.0.
+
+First use:
+* Copy the sample-config.cfg to ~/.danbooru-daemon.cfg and adapt it for
+  your needs.
+  
+* Run the following:
+  - "danbooru_daemon -a update" to download the image data from the site to
+    the sqlite database.
+  - "danbooru_daemon -a download" to download the images registered in the
+    database.
+  - "danbooru_daemon -a nepomuk" to tag the images downloaded with the info
+    previously stored in the database.
+  - "danbooru_daemon -a cleanup" to move the images who aren't in the database
+    to the root image directory.
+  - "danbooru_daemon -a daemon" to run update and download for every configured
+    site, and retry after the specified ammount of time indicated in the config.
+    
+ The recommended setup is to run the danbooru_daemon as a daemon so it gets new
+ images, tags and info periodically.
+ 
+ Special search terms for the danbooru_gui:
+ * "width:[<>]size": search for images with the specified width, use ">" or
+   "<" to search images that are less or greater than the specified width.
+   e.g.: width:>1024 (search images that have more than 1024 pixels of width).
+ 
+  * "height:[<>]size": search for images with the specified width, use ">" or
+   "<" to search images that are less or greater than the specified height.
+   e.g.: height:1080 (search images that have exactly 1080 pixels of height).
+   
+  * "site:board_alias": search for images from the specified board (for the alias,
+    use the name of section in the config file).
+   
+  * "rating:safe|questionable|explicit": search for images with the specified
+    rating. This term requires to use "site:alias" too.
+    
+  * "ratio:width:height": search for images with the specified aspect ratio.
+   e.g.: ratio:16:9 (search for images with 16:9 aspect ratio).
+ 
