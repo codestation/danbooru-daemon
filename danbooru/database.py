@@ -198,6 +198,10 @@ class Database(object):
                             sql += " AND "
                         sql += "rating = '%s'" % char
                         break
+            if items.get("ratio"):
+                if sql:
+                    sql += " AND "
+                sql += "width * 1.0 / height = %i * 1.0 / %i" % (items['ratio_width'], items['ratio_height'])
             if sql:
                 sql = " %s %s" % (first, sql)
         return sql

@@ -29,22 +29,22 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     SLIDER_MULT = 16
     img = None
-    info_format = ("<table>" +
-                   "<tr><td align='right'><b>Width:</b></td>" +
-                   "<td><a href='width:%i'>%i</a></td></tr>" +
-                   "<tr><td align='right'><b>Height:</b></td>" +
-                   "<td><a href='height:%i'>%i</a></td></tr>" +
-                   "<tr><td align='right'><b>Tags:</b></td>" +
-                   "<td>%s</td></tr>" +
-                   "<tr><td align='right'><b>Rating:</b></td>" +
-                   "<td><a href='rating:%s'>%s</a></td></tr>" +
-                   "<tr><td align='right'><b>Score:</b></td>" +
-                   "<td>%i</td></tr>" +
-                   "<tr><td align='right'><b>From:</b></td>" +
-                   "<td>%s</td></tr>" +
-                   "<tr><td align='right'><b>ID:</b></td>" +
-                   "<td>%i</td></tr>" +
-                   "</table>"
+    info_format = ('<table>' +
+                   '<tr><td align="right"><b>Width:</b></td>' +
+                   '<td><a href="width:%i">%i</a></td></tr>' +
+                   '<tr><td align="right"><b>Height:</b></td>' +
+                   '<td><a href="height:%i">%i</a></td></tr>' +
+                   '<tr><td align="right"><b>Tags:</b></td>' +
+                   '<td>%s</td></tr>' +
+                   '<tr><td align="right"><b>Rating:</b></td>' +
+                   '<td><a href="rating:%s">%s</a></td></tr>' +
+                   '<tr><td align="right"><b>Score:</b></td>' +
+                   '<td>%i</td></tr>' +
+                   '<tr><td align="right"><b>From:</b></td>' +
+                   '<td>%s</td></tr>' +
+                   '<tr><td align="right"><b>ID:</b></td>' +
+                   '<td>%i</td></tr>' +
+                   '</table>'
                    )
 
     def __init__(self, parent=None):
@@ -137,7 +137,7 @@ class DanbooruGUI(QtGui.QMainWindow):
             full_path = utils.post_abspath(post)
             self.img = QtGui.QImage(full_path)
             self.updatePreview()
-            tags = ["<a href='%s'>%s</a>" % (tag, tag) for tag in post['tags']]
+            tags = ['<a href="%s">%s</a>' % (tag, tag) for tag in post['tags']]
             tags = " ".join(tags)
             self.infoLabel.setText(self.info_format %
                 (post['width'], post['width'], post['height'], post['height'],
@@ -234,9 +234,9 @@ class DanbooruGUI(QtGui.QMainWindow):
                 self.addItem(post)
             self.statusLabel.setText("Found %i images" % len(posts))
             size = self.zoomSlider.value() * self.SLIDER_MULT
-            self.listWidget.setIconSize(QtCore.QSize(size, size))            
+            self.listWidget.setIconSize(QtCore.QSize(size, size))
             self.thumb.start()
-    
+
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
     w = DanbooruGUI()

@@ -107,6 +107,10 @@ def parseQuery(text):
                 query.update(parseDimension(item, "width"))
             elif item.startswith("height:"):
                 query.update(parseDimension(item, "height"))
+            elif item.startswith("ratio:"):
+                query['ratio'] = item.split(":", 1)[1]
+                query['ratio_width'] = int(item.split(":")[1])
+                query['ratio_height'] = int(item.split(":")[2])
             else:
                 query['tags'].append(item)
         return query
