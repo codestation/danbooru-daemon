@@ -18,6 +18,7 @@
 import shutil
 import hashlib
 import logging
+from os import remove
 from time import sleep
 from urllib.parse import urlsplit
 from urllib.request import urlopen
@@ -87,6 +88,7 @@ class Downloader(object):
                     shutil.copyfileobj(remote_file, local_file)
                     remote_file.close()                
                     local_file.close()
+                    filename = None
                     logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))                    
                     self._total += 1
                     sleep(1)
@@ -95,6 +97,11 @@ class Downloader(object):
                     logging.error('>>> Error %s' % e.reason)
                 except HTTPError as e:
                     logging.error('>>> Error %i: %s' % (e.code, e.msg))
+
+                # delete incomplete file
+                local_file.close()
+                remove(filename)
+
                 retries += 1
                 logging.warning('Retrying (%i) in 2 seconds...' % retries)
                 sleep(2)
