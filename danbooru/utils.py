@@ -17,46 +17,8 @@
 
 import re
 import danbooru
-from os import makedirs
-from PyQt4 import QtCore, QtGui
 from urllib.parse import urlsplit
 from os.path import basename, splitext, exists, join, dirname, abspath
-
-
-class ThumbnailCache(object):
-
-    MAX_SIZE = 256
-
-    def __init__(self, path):
-        self.path = path
-        makedirs(path, exist_ok=True)
-
-    def getThumbnail(self, path):
-        if exists(path):
-            base = splitext(basename(path))[0]
-            image = QtGui.QImage()
-            if image.load(join(self.path, base + ".png"), format="png"):
-                return image
-            else:
-                image = self.scaleImage(path, self.MAX_SIZE)
-                image.save(join(self.path, base + ".png"), format="png")
-                return image
-
-    def scaleImage(self, path, length):
-        image_reader = QtGui.QImageReader(path)
-        image_width = image_reader.size().width()
-        image_height = image_reader.size().height()
-        if image_width > image_height:
-            image_height = int(length * 1.0 / image_width * image_height)
-            image_width = length
-        elif image_width < image_height:
-            image_width = int(length * 1.0 / image_height * image_width)
-            image_height = length
-        else:
-            image_width = length
-            image_height = length
-        image_reader.setScaledSize(QtCore.QSize(image_width, image_height))
-        return QtGui.QImage(image_reader.read())
 
 
 def list_generator(list_widget):
