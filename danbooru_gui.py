@@ -16,6 +16,7 @@
 #   limitations under the License.
 
 import sys
+from locale import getlocale
 from os.path import join, expanduser
 from PyQt4 import QtCore, QtGui, uic
 
@@ -28,27 +29,28 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     SLIDER_MULT = 16
     img = None
+
     info_format = ('<table>' +
-                   '<tr><td align="right"><b>Width:</b></td>' +
-                   '<td><a href="width:%i">%i</a></td></tr>' +
-                   '<tr><td align="right"><b>Height:</b></td>' +
-                   '<td><a href="height:%i">%i</a></td></tr>' +
-                   '<tr><td align="right"><b>Tags:</b></td>' +
-                   '<td>%s</td></tr>' +
-                   '<tr><td align="right"><b>Rating:</b></td>' +
-                   '<td><a href="rating:%s">%s</a></td></tr>' +
-                   '<tr><td align="right"><b>Score:</b></td>' +
-                   '<td>%i</td></tr>' +
-                   '<tr><td align="right"><b>From:</b></td>' +
-                   '<td>%s</td></tr>' +
-                   '<tr><td align="right"><b>ID:</b></td>' +
-                   '<td>%i</td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td><a href="width:%%i">%%i</a></td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td><a href="height:%%i">%%i</a></td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td>%%s</td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td><a href="rating:%%s">%%s</a></td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td>%%i</td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td>%%s</td></tr>' +
+                   '<tr><td align="right"><b>%s:</b></td>' +
+                   '<td>%%i</td></tr>' +
                    '</table>'
                    )
 
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
-        self.ui = uic.loadUi(utils.find_resource("ui/danbooru.ui"), self)
+        self.ui = uic.loadUi(utils.find_resource(__name__, "ui/danbooru.ui"), self)
         self.setupUI()
         self.loadSettings()
 
@@ -78,7 +80,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.clearButton.setVisible(False)
         self.clearButton.setStyleSheet("QPushButton { border: none; padding: 0px; }")
         self.clearButton.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
-        icon = QtGui.QIcon(utils.find_resource("ui/query-clear.png"))
+        icon = QtGui.QIcon(utils.find_resource(__name__, "ui/query-clear.png"))
         self.clearButton.setIcon(icon)
         self.clearButton.clicked.connect(self.queryBox.clear)
         self.queryBox.textChanged.connect(self.updateClearButton)
@@ -88,6 +90,9 @@ class DanbooruGUI(QtGui.QMainWindow):
         layout.addWidget(self.clearButton)
 
     def loadSettings(self):
+        self.info_values = (self.tr("Width"), self.tr("Height"), self.tr("Tags"), self.tr("Rating"),
+                            self.tr("Score"), self.tr("From"), self.tr("ID"))
+
         # load user settings
         user_dir = expanduser("~")
         cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
@@ -118,23 +123,24 @@ class DanbooruGUI(QtGui.QMainWindow):
     def selectionChanged(self):
         items = self.listWidget.selectedItems()
         if not items:
-            self.nameLabel.setText("No selection")
+            self.nameLabel.setText(self.tr("No selection"))
             self.img = None
         elif len(items) == 1:
             item = items[0]
-            self.nameLabel.setText("1 selected item")
+            self.nameLabel.setText(self.tr("1 selected item"))
             post = item.data(QtCore.Qt.UserRole)
             full_path = utils.post_abspath(post)
             self.img = QtGui.QImage(full_path)
             self.updatePreview()
             tags = ['<a href="%s">%s</a>' % (tag, tag) for tag in post['tags']]
             tags = " ".join(tags)
-            self.infoLabel.setText(self.info_format %
+            str_format = self.info_format % self.info_values
+            self.infoLabel.setText(str_format %
                 (post['width'], post['width'], post['height'], post['height'],
                  tags, post['rating'], post['rating'], post['score'],
                  post['board_url'], post['id']))
         else:
-            self.nameLabel.setText("%i selected items" % len(items))
+            self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None
 
     def tagSelected(self, tag):
@@ -155,7 +161,7 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     def sliderMove(self, value):
         value *= self.SLIDER_MULT
-        self.zoomSlider.setToolTip("Size: %i pixels" % value)
+        self.zoomSlider.setToolTip(self.tr("Size: %i pixels") % value)
         self.listWidget.setIconSize(QtCore.QSize(value, value))
         generator = utils.list_generator(self.listWidget)
         for item in generator:
@@ -183,26 +189,42 @@ class DanbooruGUI(QtGui.QMainWindow):
                 self.db.setHost(host=None, alias=query['site'])
             else:
                 if query.get('rating'):
-                    self.statusLabel.setText("Search by rating depends on site")
+                    self.statusLabel.setText(self.tr("Search by rating depends on site"))
                     return
                 self.db.clearHost()
             self.thumb.stop()
             self.thumb.wait()
             self.listWidget.clear()
-            self.statusLabel.setText("Processing...")
+            self.statusLabel.setText(self.tr("Processing..."))
             if query.get('tags'):
                 posts = self.db.getANDPosts(query['tags'], limit=100, extra_items=query)
             else:
                 posts = self.db.getPosts(100, extra_items=query)
             for post in posts:
                 self.addItem(post)
-            self.statusLabel.setText("Found %i images" % len(posts))
+            self.statusLabel.setText(self.tr("Found %i images") % len(posts))
             size = self.zoomSlider.value() * self.SLIDER_MULT
             self.listWidget.setIconSize(QtCore.QSize(size, size))
             self.thumb.start()
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
+
+    locale = getlocale()
+    if locale[0]:
+        translator = QtCore.QTranslator(app)
+        try:
+            resource = utils.find_resource(__file__, "danbooru_gui-%s.qm" % locale[0])
+            if translator.load(resource):
+                app.installTranslator(translator)
+        except Exception:
+            try:
+                resource = utils.find_resource(__file__, "danbooru_gui-%s.qm" % locale[0].split("_")[0])
+                if translator.load(resource):
+                    app.installTranslator(translator)
+            except Exception:
+                pass
+
     w = DanbooruGUI()
     w.show()
     sys.exit(app.exec_())

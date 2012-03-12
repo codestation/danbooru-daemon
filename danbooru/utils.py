@@ -16,7 +16,6 @@
 #   limitations under the License.
 
 import re
-import danbooru
 from urllib.parse import urlsplit
 from os.path import basename, splitext, exists, join, dirname, abspath
 
@@ -80,12 +79,15 @@ def parseQuery(text):
         return item
 
 
-def find_resource(filename):
-    base_path = [".", dirname(abspath(danbooru.__file__)),
+def find_resource(base, filename):
+    base_path = [dirname(abspath(base)),
                  "/usr/local/share/danbooru-daemon",
                  "/usr/share/danbooru-daemon"]
+
     for path in base_path:
         full_path = join(path, filename)
+
         if exists(full_path):
             return full_path
+
     raise Exception("%s cannot be found." % filename)

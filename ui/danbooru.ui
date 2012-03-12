@@ -20,7 +20,11 @@
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QLineEdit" name="queryBox"/>
+         <widget class="QLineEdit" name="queryBox">
+          <property name="placeholderText">
+           <string>Enter the search terms, e.g.: vocaloid site:danbooru ratio:16:9</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="searchButton">
