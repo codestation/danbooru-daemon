@@ -74,7 +74,7 @@ class Downloader(object):
                     continue
                 else:
                     logging.warning("%s md5sum doesn't match, re-downloading" % filename)
-                        
+
             try:
                 local_file = open(filename, 'wb')
             except IOError:
@@ -86,10 +86,10 @@ class Downloader(object):
                 try:
                     remote_file = urlopen(dl['file_url'])
                     shutil.copyfileobj(remote_file, local_file)
-                    remote_file.close()                
+                    remote_file.close()
                     local_file.close()
                     filename = None
-                    logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))                    
+                    logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))
                     self._total += 1
                     sleep(1)
                     break
@@ -101,6 +101,7 @@ class Downloader(object):
                 # delete incomplete file
                 local_file.close()
                 remove(filename)
+                local_file = open(filename, 'wb')
 
                 retries += 1
                 logging.warning('Retrying (%i) in 2 seconds...' % retries)
