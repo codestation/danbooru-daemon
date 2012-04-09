@@ -30,6 +30,8 @@ class DanbooruGUI(QtGui.QMainWindow):
     SLIDER_MULT = 16
     img = None
 
+    BASE_DIR = "."
+
     info_format = ('<table>' +
                    '<tr><td align="right"><b>%s:</b></td>' +
                    '<td><a href="width:%%i">%%i</a></td></tr>' +
@@ -62,6 +64,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.searchButton.clicked.connect(self.startSearch)
         self.queryBox.returnPressed.connect(self.startSearch)
         self.zoomSlider.sliderMoved.connect(self.sliderMove)
+        self.listWidget.itemEntered.connect(self.itemOver)
         self.listWidget.itemSelectionChanged.connect(self.selectionChanged)
         self.infoLabel.linkActivated.connect(self.tagSelected)
         # UI event overrides
@@ -72,7 +75,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
 
         # Other setup
-        self.thumb = ui.ThumbnailWorker(self.listWidget)
+        self.thumb = ui.ThumbnailWorker(self.BASE_DIR, self.listWidget)
         self.thumb.makeIconSignal.connect(self.makeIcon)
 
         # Add clear button on queryBox
@@ -97,11 +100,18 @@ class DanbooruGUI(QtGui.QMainWindow):
         user_dir = expanduser("~")
         cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
         cfg.load("default", [], {'dbname': None})
+
+        # Get the base path for image search
+        self.BASE_DIR = cfg.download_path
+
         if not cfg.dbname:
             daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
             cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
         dbname = join(daemon_dir, cfg.dbname)
         self.db = Database(dbname)
+
+    def itemOver(self, item_img):
+        pass
 
     def updateClearButton(self, text):
         self.clearButton.setVisible(bool(text))
@@ -129,7 +139,7 @@ class DanbooruGUI(QtGui.QMainWindow):
             item = items[0]
             self.nameLabel.setText(self.tr("1 selected item"))
             post = item.data(QtCore.Qt.UserRole)
-            full_path = utils.post_abspath(post)
+            full_path = utils.post_abspath(self.BASE_DIR, post)
             self.img = QtGui.QImage(full_path)
             self.updatePreview()
             tags = ['<a href="%s">%s</a>' % (tag, tag) for tag in post['tags']]
@@ -149,7 +159,7 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     def itemClicked(self, item):
         post = item.data(QtCore.Qt.UserRole)
-        full_path = utils.post_abspath(post)
+        full_path = utils.post_abspath(self.BASE_DIR, post)
         self.previewWidget.setPixmap(QtGui.QPixmap(full_path))
 
     def makeIcon(self, item, image):
@@ -182,7 +192,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         if text:
             query = utils.parseQuery(text)
             if isinstance(query, str):
-                self.statusLabel.setText("Error in term: %s" % query)
+                self.statusLabel.setText(self.tr("Error in term: %s") % query)
                 return
 
             if query.get('site'):

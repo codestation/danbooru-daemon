@@ -24,6 +24,7 @@ import re
 from time import sleep
 from os import listdir, makedirs
 from os.path import join, isdir, isfile, splitext, expanduser
+from danbooru.error import DanbooruError
 from danbooru.api import Api
 from danbooru.database import Database
 from danbooru.settings import Settings
@@ -130,11 +131,15 @@ class Daemon(object):
         if before_id:
             return int(before_id)
         else:
-            posts = board.getPostsPage(tags, 1, 1)
-            if not posts:
-                logging.error('Error: cannot get last post id')
-                sys.exit(1)
-            return posts[0]['id'] + 1      
+            try:
+                posts = board.getPostsPage(tags, 1, 1)
+                if posts:
+                    return posts[0]['id'] + 1
+                else:                    
+                    logging.error('Error: cannot get last post id')
+            except DanbooruError as e:
+                logging.error(e.message)
+            sys.exit(1)
 
     def main(self):
         user_dir = expanduser("~")

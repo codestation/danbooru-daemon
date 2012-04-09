@@ -19,9 +19,12 @@ import re
 import json
 import hashlib
 import logging
+
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 from time import sleep, time, gmtime, strftime
+
+from danbooru.error import DanbooruError
 
 
 class Api(object):
@@ -29,7 +32,6 @@ class Api(object):
     post_api = '/post/index.json'
     tag_api = '/tag/index.json'
 
-    _delta_time = 0
     WAIT_TIME = 1.2
 
     def __init__(self, host, username, password, salt):
@@ -37,6 +39,8 @@ class Api(object):
         self.username = username
         self.password = password
         self.salt = salt
+        self._delta_time = 0
+        self._login_string = None
 
     def _wait(self):
         self._delta_time = time() - self._delta_time
@@ -44,9 +48,12 @@ class Api(object):
             sleep(self.WAIT_TIME - self._delta_time)
 
     def _loginData(self):
-        sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
-        sha1_password = sha1data.hexdigest()
-        return '&login=%s&password_hash=%s' % (self.username, sha1_password)
+        if not self._login_string:
+            sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
+            sha1_password = sha1data.hexdigest()
+            # save the result to use it in the next calls
+            self._login_string = '&login=%s&password_hash=%s' % (self.username, sha1_password)
+        return self._login_string
 
     def getPostsPage(self, tags, page, limit, blacklist=None, whitelist=None):
         tags = ','.join(tags)
@@ -54,8 +61,7 @@ class Api(object):
               tags, page, limit) + self._loginData()
         return self.getPosts(url, blacklist, whitelist)
 
-    def getPostsBefore(self, post_id, tags, limit, blacklist=None,
-                       whitelist=None):
+    def getPostsBefore(self, post_id, tags, limit, blacklist=None, whitelist=None):
         tags = ','.join(tags)
         url = "%s%s?before_id=%i&tags=%s&limit=%i" % (self.host, self.post_api,
               post_id, tags, limit) + self._loginData()
@@ -95,11 +101,11 @@ class Api(object):
                     logging.debug("%i posts filtered by the blacklist" % post_count)
 
             return posts
-        except HTTPError as e:
-            print('>>> Error %i: %s' % (e.code, e.msg))
-        except URLError as e:
-            print('>>> Error %s' % e.args)
-        return []
+        except (URLError, HTTPError) as e:
+            if isinstance(e, HTTPError):
+                raise DanbooruError("Error %i: %s" % (e.code, e.msg))
+            else:
+                raise DanbooruError("%s (%s)" % (e.reason, self.host))
 
     def tagList(self, name):
         self._wait()
@@ -109,8 +115,8 @@ class Api(object):
             results = response.read().decode('utf8')
             tags = json.loads(results)
             return tags
-        except HTTPError as e:
-            print('>>> Error %i: %s' % (e.code, e.msg))
-        except URLError as e:
-            print('>>> Error %i: %s' % e.args)
-        return []
+        except (HTTPError, URLError) as e:
+            if isinstance(e, HTTPError):
+                raise DanbooruError("Error %i: %s" % (e.code, e.msg))
+            else:
+                raise DanbooruError("%s (%s)" % (e.reason, self.host))

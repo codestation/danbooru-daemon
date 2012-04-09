@@ -25,10 +25,10 @@ def list_generator(list_widget):
         yield list_widget.item(i)
 
 
-def post_abspath(post):
+def post_abspath(basedir, post):
     base = post_basename(post)
     subdir = post['md5'][0]
-    return join("/home/code/danbooru", subdir, base)
+    return join(basedir, subdir, base)
 
 
 def post_basename(post):

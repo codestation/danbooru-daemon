@@ -66,9 +66,10 @@ class ThumbnailWorker(QtCore.QThread):
     makeIconSignal = QtCore.pyqtSignal(QtGui.QListWidgetItem, QtGui.QImage)
     abort = False
 
-    def __init__(self, ListWidget, parent=None):
+    def __init__(self, ListWidget, basedir, parent=None):
         QtCore.QThread.__init__(self, parent)
         self.widget = ListWidget
+        self.basedir = basedir
         user_path = expanduser("~")
         self.thumbnail_dir = join(user_path, ".cache/danbooru-daemon/thumbnails")
         makedirs(self.thumbnail_dir, exist_ok=True)
@@ -83,7 +84,7 @@ class ThumbnailWorker(QtCore.QThread):
         for item in generator:
             if self.abort: break
             post = item.data(QtCore.Qt.UserRole)
-            full_path = utils.post_abspath(post)
+            full_path = utils.post_abspath(self.basedir, post)
             image = th.getThumbnail(full_path)
             self.makeIconSignal.emit(item, image)
 
