@@ -15,10 +15,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import shutil
+import sys
 import hashlib
 import logging
-from os import remove
 from time import sleep
 from urllib.parse import urlsplit
 from urllib.request import urlopen
@@ -44,17 +43,19 @@ class Downloader(object):
             md5_hash = hashlib.md5()
             while True:
                 d = file.read(128)
-                if not d: break
+                if not d:
+                    break
                 md5_hash.update(d)
             file.close()
             return md5_hash.hexdigest()
         except IOError:
             pass
-                    
-    def downloadQueue(self, dl_list, nohash=False):
+
+    def downloadQueue(self, dl_list, nohash=False, callback=None):
         for dl in dl_list:
-            if self._stop: break
-            
+            if self._stop:
+                break
+
             base = basename(urlsplit(dl['file_url'])[2])
 
             #fix extension to jpg
@@ -82,13 +83,37 @@ class Downloader(object):
                 continue
 
             retries = 0
+            start = 0
+
             while not self._stop and retries < 3:
                 try:
                     remote_file = urlopen(dl['file_url'])
-                    shutil.copyfileobj(remote_file, local_file)
+
+                    meta = remote_file.info()
+                    if "Content-Length" in meta:
+                        remote_size = int(meta['Content-Length'])
+                    else:
+                        remote_size = -1
+
+                    if start:
+                        remote_file.seek(start)
+
+                    while 1:
+                        buf = remote_file.read(16 * 1024)
+                        if not buf:
+                            break
+                        local_file.write(buf)
+                        start += len(buf)
+                        if callback:
+                            callback(base, start, remote_size)
+
                     remote_file.close()
                     local_file.close()
-                    filename = None
+
+                    if callback:
+                        sys.stdout.write("\r")
+                        sys.stdout.flush()
+
                     logging.debug('(%i) %s [OK]' % (self._total, dl['file_url']))
                     self._total += 1
                     sleep(1)
@@ -98,10 +123,7 @@ class Downloader(object):
                 except HTTPError as e:
                     logging.error('>>> Error %i: %s' % (e.code, e.msg))
 
-                # delete incomplete file
-                local_file.close()
-                remove(filename)
-                local_file = open(filename, 'wb')
+                start = local_file.tell()
 
                 retries += 1
                 logging.warning('Retrying (%i) in 2 seconds...' % retries)

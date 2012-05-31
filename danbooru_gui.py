@@ -53,8 +53,8 @@ class DanbooruGUI(QtGui.QMainWindow):
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.ui = uic.loadUi(utils.find_resource(__name__, "ui/danbooru.ui"), self)
-        self.setupUI()
         self.loadSettings()
+        self.setupUI()
 
     def setupUI(self):
         # UI settings
@@ -75,7 +75,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
 
         # Other setup
-        self.thumb = ui.ThumbnailWorker(self.BASE_DIR, self.listWidget)
+        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
         self.thumb.makeIconSignal.connect(self.makeIcon)
 
         # Add clear button on queryBox
@@ -99,7 +99,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         # load user settings
         user_dir = expanduser("~")
         cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
-        cfg.load("default", [], {'dbname': None})
+        cfg.load("default", ['download_path'], {'dbname': None})
 
         # Get the base path for image search
         self.BASE_DIR = cfg.download_path
@@ -207,9 +207,9 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.listWidget.clear()
             self.statusLabel.setText(self.tr("Processing..."))
             if query.get('tags'):
-                posts = self.db.getANDPosts(query['tags'], limit=100, extra_items=query)
+                posts = self.db.getANDPosts(query['tags'], limit=200, extra_items=query)
             else:
-                posts = self.db.getPosts(100, extra_items=query)
+                posts = self.db.getPosts(200, extra_items=query)
             for post in posts:
                 self.addItem(post)
             self.statusLabel.setText(self.tr("Found %i images") % len(posts))

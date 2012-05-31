@@ -21,8 +21,8 @@ from os.path import abspath, join, isdir, isfile
 
 from PyQt4 import QtCore
 from PyKDE4.kdecore import KUrl
-from PyKDE4.nepomuk import Nepomuk
-from PyKDE4.soprano import Soprano
+from PyKDE4.nepomuk import Nepomuk  # @UnresolvedImport
+from PyKDE4.soprano import Soprano  # @UnresolvedImport
 
 
 class NepomukTask(object):
@@ -73,7 +73,8 @@ class NepomukJob(QtCore.QObject):
     def updateDirTags(self, directory):
         loop = QtCore.QEventLoop()
         for name in listdir(directory):
-            if self._stop: break
+            if self._stop:
+                break
             full_path = join(directory, name)
             if isdir(full_path):
                 self.updateDirTags(full_path)
@@ -88,35 +89,35 @@ class NepomukJob(QtCore.QObject):
                 else:
                     logging.debug('%s isn\'t in database' % name)
         QtCore.QCoreApplication.quit()
-            
+
     def updateFile(self):
         self.updateFileTags(self.file_path)
-        
+
     def updateDir(self):
         self.updateDirTags(self.start_path)
-        
+
     def removeProperties(self, res, ontologies):
         for ontology in ontologies:
             res.removeProperty(KUrl(self.ndbu_uri % ontology))
-            
+
     def setProperty(self, res, ontology, prop):
         res.setProperty(KUrl(self.ndbu_uri % ontology), Nepomuk.Variant(prop))
-        
+
     def getResource(self, res):
         if isinstance(res, str):
             absolute_path = abspath(res)
             return Nepomuk.File(KUrl(absolute_path))
         else:
             return res
-        
+
     def _addTag(self, res, name):
         tag = Nepomuk.Tag(name)
         tag.setLabel(name)
         res.addTag(tag)
-        
+
     def updateFileTags(self, filename, post, skip=False):
         res = self.getResource(filename)
-        
+
         if skip and res.hasProperty(Soprano.Vocabulary.NAO.personalIdentifier()):
             return
 
@@ -134,7 +135,7 @@ class NepomukJob(QtCore.QObject):
         url_res.addType(Nepomuk.Vocabulary.NFO.Website())
         url_res.setLabel(url.prettyUrl())
         res.addIsRelated(url_res)
-        
+
         if post['source']:
             res.setDescription("Source: %s" % KUrl(post['source']).prettyUrl())
 
@@ -143,26 +144,26 @@ class NepomukJob(QtCore.QObject):
 
         if post['author']:
             res.addProperty(Soprano.Vocabulary.NAO.contributor(), Nepomuk.Variant(post['author']))
-            
+
         if post['rating']:
             self._addTag(res, "rating-%s" % post['rating'])
-            
+
         res.addProperty(Soprano.Vocabulary.NAO.personalIdentifier(), Nepomuk.Variant(str(post['id'])))
-        
-        
+
     def setRating(self, file, rating):
-        if rating not in range(0, 11): return
+        if rating not in range(0, 11):
+            return
         resource = self.getResource(file)
         resource.setRating(rating)
-        
+
     def getRating(self, file):
         resource = self.getResource(file)
         return resource.rating()
-            
+
     def getTags(self, file):
             resource = self.getResource(file)
             return [x.label() for x in resource.tags()]
-            
-    def removeTags(self, file):        
+
+    def removeTags(self, file):
         resource = self.getResource(file)
         resource.removeProperty(resource.tagUri())

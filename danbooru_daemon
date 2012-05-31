@@ -93,17 +93,20 @@ class Daemon(object):
         # use default tags from file
         if cfg.default_tags:
             default_tags = [x.strip() for x in re.sub(' +', ' ', cfg.default_tags).split(' ')]
-            if not args.tags: args.tags = []
+            if not args.tags:
+                args.tags = []
             args.tags = args.tags + list(set(default_tags) - set(args.tags))
 
         if cfg.blacklist:
-            blacklist_tags = [x.strip() for x in re.sub(' +',' ',cfg.blacklist).split(' ')]
-            if not args.blacklist: args.blacklist = []
+            blacklist_tags = [x.strip() for x in re.sub(' +', ' ', cfg.blacklist).split(' ')]
+            if not args.blacklist:
+                args.blacklist = []
             args.blacklist = args.blacklist + list(set(blacklist_tags) - set(args.blacklist))
 
         if cfg.whitelist:
-            whitelist_tags = [x.strip() for x in re.sub(' +',' ',cfg.whitelist).split(' ')]
-            if not args.whitelist: args.whitelist = []
+            whitelist_tags = [x.strip() for x in re.sub(' +', ' ', cfg.whitelist).split(' ')]
+            if not args.whitelist:
+                args.whitelist = []
             args.whitelist = args.whitelist + list(set(whitelist_tags) - set(args.whitelist))
 
         # cut down the tag list if it have too much items
@@ -111,19 +114,19 @@ class Daemon(object):
         if args.tags and len(args.tags) > max_tags_number:
             logging.warning('Using more than %i tags, cutting down list' % max_tags_number)
             args.tags = args.tags[:max_tags_number]
-            
+
     def abort(self):
         self._stop = True
         for k in self.abort_list.keys():
             self.abort_list[k].stop()
-            
+
     def registerClassSignal(self, cls):
         self.abort_list[cls.__class__.__name__] = cls
-        
+
     def unregisterClassSignal(self, cls):
         del self.abort_list[cls.__class__.__name__]
-            
-    def signalHandler(self, signal, frame): #@UnusedVariable
+
+    def signalHandler(self, signal, frame):  # @UnusedVariable
         logging.info('Ctrl+C detected, shutting down...')
         self.abort()
 
@@ -135,7 +138,7 @@ class Daemon(object):
                 posts = board.getPostsPage(tags, 1, 1)
                 if posts:
                     return posts[0]['id'] + 1
-                else:                    
+                else:
                     logging.error('Error: cannot get last post id')
             except DanbooruError as e:
                 logging.error(e.message)
@@ -156,36 +159,36 @@ class Daemon(object):
         self.parseTags(args, cfg)
         signal.signal(signal.SIGINT, self.signalHandler)
 
-        if not cfg.dbname:            
+        if not cfg.dbname:
             daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
             makedirs(daemon_dir, exist_ok=True)
             cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
-    
+
         db = Database(cfg.dbname)
         db.setHost(cfg.host, args.section)
-        
+
         if args.action == "daemon":
             self.run_daemon(args, db)
-        elif args.action == "update":            
+        elif args.action == "update":
             board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_update(args, cfg, board, db)
         elif args.action == "download":
             self.run_download(cfg, db)
         elif args.action == "nepomuk":
             self.run_nepomuk(cfg, db)
-        elif args.action == "tags":            
+        elif args.action == "tags":
             board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_tags(args, db, board)
         elif args.action == "cleanup":
-            self.cleanup(cfg, db, cfg.download_path)
-            
+            self.cleanup(cfg, db, args, cfg.download_path)
+
     def run_daemon(self, args, db):
         cfg = self.readConfig(args.config, "default", ['fetch_from', ('fetch_interval', int)], [])
-        
+
         if not cfg.fetch_from:
             logging.error('The fetch_from config option cannot be empty in daemon mode')
             sys.exit(1)
-            
+
         if not cfg.fetch_interval:
             logging.error('The fetch_interval config option cannot be empty in daemon mode')
             sys.exit(1)
@@ -195,22 +198,25 @@ class Daemon(object):
 
         while not self._stop:
             for section in sections:
-                if self._stop: return
+                if self._stop:
+                    return
                 cfg = self.readConfig(args.config, section, self.config_required, self.config_optional)
-                db.setHost(cfg.host, section)                          
+                db.setHost(cfg.host, section)
                 board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
                 logging.debug("Run upload mode for %s" % section)
                 self.run_update(args, cfg, board, db)
-                if self._stop: return
+                if self._stop:
+                    return
                 logging.debug("Run download mode for %s" % section)
                 self.run_download(cfg, db)
-                if self._stop: return
+                if self._stop:
+                    return
                 #logging.debug("Run nepomuk mode for %s" % section)
                 #self.run_nepomuk(cfg, db)
                 #if self._abort: break
             logging.debug("Waiting for %i seconds" % sleep_time)
             sleep(sleep_time)
-    
+
     def run_update(self, args, cfg, board, db):
         if not args.tags:
             logging.error('No tags specified. Aborting.')
@@ -250,26 +256,31 @@ class Daemon(object):
             else:
                 logging.debug('No posts returned')
                 break
-            
+
     def run_download(self, cfg, db):
         dl = Downloader(cfg.download_path)
         self.registerClassSignal(dl)
         offset = 0
+
+        def callback(file, current, total):
+            sys.stdout.write("\r%s: %i of %i bytes" % (file, current, total))
+            sys.stdout.flush()
+
         while not self._stop:
             rows = db.getFiles(100, offset)
             if not rows:
                 break
-            dl.downloadQueue(rows, cfg.skip_file_check)
+            dl.downloadQueue(rows, cfg.skip_file_check, callback)
             offset += 100
         self.unregisterClassSignal(dl)
-            
+
     def run_nepomuk(self, cfg, db):
         from danbooru.nepomuk import NepomukTask
         nk = NepomukTask()
         self.registerClassSignal(nk)
         nk.updateDirectoryTags(cfg.download_path, db)
         self.unregisterClassSignal(nk)
-            
+
     def run_tags(self, args, cfg, db, board):
         last_id = self.getLastId(args.tags, board, args.before_id)
         while not self._stop:
@@ -280,10 +291,11 @@ class Daemon(object):
                 logging.debug('Next fetch id: %i' % last_id)
             else:
                 break
-            
+
     def clean_loop(self, directory, dest, db):
         for name in listdir(directory):
-            if self._stop: break
+            if self._stop:
+                break
             full_path = join(directory, name)
             if isdir(full_path):
                 self.clean_loop(full_path, dest, db)
@@ -292,8 +304,9 @@ class Daemon(object):
                 if not db.fileExists(md5):
                     logging.debug('%s isn\'t in database' % name)
                     shutil.move(full_path, join(dest, name))
-            
-    def cleanup(self, cfg, db, dest):
+
+    def cleanup(self, cfg, db, args, dest):
+        db.deletePostsByTags(args.blacklist, args.whitelist)
         self.clean_loop(cfg.download_path, dest, db)
 
 if __name__ == '__main__':

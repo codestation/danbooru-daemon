@@ -82,7 +82,8 @@ class ThumbnailWorker(QtCore.QThread):
         th = ThumbnailCache(self.thumbnail_dir)
         generator = utils.list_generator(self.widget)
         for item in generator:
-            if self.abort: break
+            if self.abort:
+                break
             post = item.data(QtCore.Qt.UserRole)
             full_path = utils.post_abspath(self.basedir, post)
             image = th.getThumbnail(full_path)

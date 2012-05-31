@@ -174,8 +174,10 @@ class Database(object):
 
     def getORPosts(self, tags, limit):
         placeholders = ', '.join('?' for unused in tags)
-        sql = ('SELECT * FROM post WHERE id IN (SELECT DISTINCT post_id from ' +
-              'post_tag WHERE tag_name IN (%s)) GROUP BY md5 ORDER BY id DESC')
+
+        sql = "SELECT * FROM post JOIN post_tag USING (post_id, board_id) WHERE " \
+        "tag_name IN (%s)) GROUP BY md5 ORDER BY id DESC"
+
         if limit > 0:
             sql += ' LIMIT %i' % limit
         self.conn.row_factory = self.dict_factory
@@ -211,14 +213,16 @@ class Database(object):
         self.conn.row_factory = self.dict_factory
         placeholders = ', '.join('?' for unused in tags)
         extra_sql = self.dictToQuery(extra_items)
+
         if self.board_id:
-            sql = ("SELECT * FROM post WHERE board_id=%i AND id IN (SELECT post_id FROM post_tag " +
-                   "WHERE board_id=%i AND tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " +
-                   "%s GROUP BY md5 ORDER BY id DESC")
+            sql = "SELECT * FROM post, post_tag WHERE post.id = post_tag.post_id AND " \
+            "post.board_id=%i AND tag_name IN (%s) GROUP BY md5 " \
+            "HAVING COUNT(DISTINCT tag_name) = %i %s"
         else:
-            sql = ("SELECT * FROM post WHERE id IN (SELECT post_id FROM post_tag " +
-                   "WHERE tag_name IN (%s) GROUP BY post_id HAVING COUNT(tag_name) = %i) " +
-                   "%s GROUP BY md5 ORDER BY id DESC")
+            sql = "SELECT * FROM post, post_tag WHERE post.id = post_tag.post_id AND " \
+            "post.board_id = post_tag.board_id AND tag_name IN (%s) GROUP BY md5 " \
+            "HAVING COUNT(DISTINCT tag_name) = %i %s"
+
         if limit > 0:
             sql += ' LIMIT %i' % limit
         if self.board_id:
@@ -246,3 +250,30 @@ class Database(object):
         else:
             rows = self.conn.execute('SELECT file_url, md5 FROM post ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))
         return [file for file in rows]
+
+    def deletePostsByTags(self, blacklist, whitelist):
+        if blacklist:
+            self.conn.row_factory = self.dict_factory
+            placeholders = ', '.join('?' for unused in blacklist)
+            if not whitelist:
+                sql = "DELETE FROM post, post_tag WHERE post.id = post_tag.post_id " \
+                "AND post.board_id = post_tag.board_id AND post_tag.tag_name IN (%s)"
+
+                self.conn.executemany(sql % placeholders, blacklist)
+                self.conn.executemany("DELETE FROM post_tag WHERE tag_name IN (%s)" % placeholders, blacklist)
+            else:
+                placeholder_2 = ', '.join('?' for unused in whitelist)
+
+                blacklist.extend(whitelist)
+
+                sql = "DELETE FROM post WHERE EXISTS (SELECT 1 FROM post_tag WHERE " \
+                "post.id = post_tag.post_id AND post.board_id = post_tag.board_id " \
+                "AND post_tag.tag_name IN (%s) AND post_tag.post_id NOT IN " \
+                "(SELECT post_id FROM post_tag WHERE tag_name IN (%s) GROUP BY post_id))"
+
+                self.conn.execute(sql % (placeholders, placeholder_2), blacklist)
+
+                sql = "DELETE FROM post_tag WHERE tag_name IN (%s) AND tag_name NOT in (%s)"
+                self.conn.execute(sql % (placeholders, placeholder_2), blacklist)
+
+            self.conn.commit()
