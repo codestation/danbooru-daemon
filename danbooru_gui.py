@@ -148,7 +148,7 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.infoLabel.setText(str_format %
                 (post['width'], post['width'], post['height'], post['height'],
                  tags, post['rating'], post['rating'], post['score'],
-                 post['board_url'], post['id']))
+                 post['board_url'], post['post_id']))
         else:
             self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None

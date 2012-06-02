@@ -1,10 +1,12 @@
 CREATE TABLE IF NOT EXISTS "main"."board" (
-    "id" INTEGER PRIMARY KEY NOT NULL,
-    "name" TEXT UNIQUE NOT NULL,
-    "alias" TEXT UNIQUE
+    "board_id" INTEGER PRIMARY KEY NOT NULL,
+    "name" TEXT NOT NULL,
+    "alias" TEXT NOT NULL,
+    UNIQUE("name", "alias"),
+    CHECK (TYPEOF(board_id) = 'integer')
 );
 CREATE TABLE IF NOT EXISTS "main"."post" (
-    "id" INTEGER NOT NULL,    
+    "post_id" INTEGER NOT NULL,
     "board_id" INTEGER NOT NULL,
     "width" INTEGER,
     "height" INTEGER,
@@ -29,8 +31,10 @@ CREATE TABLE IF NOT EXISTS "main"."post" (
     "has_notes" INTEGER,
     "has_comments" INTEGER,
     "has_children" INTEGER,
-    PRIMARY KEY ("id", "board_id"),
-    FOREIGN KEY ("board_id") REFERENCES "board"("id")
+    PRIMARY KEY ("post_id", "board_id"),
+    FOREIGN KEY ("board_id") REFERENCES "board"("post_id"),
+    CHECK (TYPEOF(post_id) = 'integer'),
+    CHECK (TYPEOF(board_id) = 'integer')
 );
 CREATE INDEX IF NOT EXISTS "post_md5_idx" ON "post" ("md5");
 CREATE TABLE IF NOT EXISTS "main"."post_tag" (
@@ -38,17 +42,21 @@ CREATE TABLE IF NOT EXISTS "main"."post_tag" (
     "board_id" INTEGER NOT NULL,
     "tag_name" TEXT NOT NULL,    
     PRIMARY KEY ("post_id", "board_id", "tag_name"),
-    FOREIGN KEY ("post_id") REFERENCES "post"("id"),
-    FOREIGN KEY ("board_id") REFERENCES "board"("id")
+    FOREIGN KEY ("post_id") REFERENCES "post"("post_id"),
+    FOREIGN KEY ("board_id") REFERENCES "board"("board_id"),
+    CHECK (TYPEOF(post_id) = 'integer'),
+    CHECK (TYPEOF(board_id) = 'integer')
 );
 CREATE TABLE IF NOT EXISTS "main"."tag" (
-    "id" INTEGER NOT NULL,    
+    "tag_id" INTEGER NOT NULL,
     "board_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "type" INTEGER,
     "ambiguous" INTEGER,
     "count" INTEGER,
-    PRIMARY KEY ("id", "board_id"),
-    FOREIGN KEY ("board_id") REFERENCES "board"("id")
+    PRIMARY KEY ("tag_id", "board_id"),
+    FOREIGN KEY ("board_id") REFERENCES "board"("id"),
+    CHECK (TYPEOF(tag_id) = 'integer'),
+    CHECK (TYPEOF(board_id) = 'integer')
 );
 CREATE INDEX IF NOT EXISTS "tag_name_idx" ON "tag" ("name");

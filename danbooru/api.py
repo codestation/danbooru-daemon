@@ -22,6 +22,7 @@ import logging
 
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
+from http.client import BadStatusLine
 from time import sleep, time, gmtime, strftime
 
 from danbooru.error import DanbooruError
@@ -101,9 +102,11 @@ class Api(object):
                     logging.debug("%i posts filtered by the blacklist" % post_count)
 
             return posts
-        except (URLError, HTTPError) as e:
+        except (URLError, HTTPError, BadStatusLine) as e:
             if isinstance(e, HTTPError):
                 raise DanbooruError("Error %i: %s" % (e.code, e.msg))
+            elif isinstance(e, BadStatusLine):
+                raise DanbooruError("Error: Cannot fetch from %s" % url)
             else:
                 raise DanbooruError("%s (%s)" % (e.reason, self.host))
 

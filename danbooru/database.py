@@ -73,7 +73,7 @@ class Database(object):
 
     def getHost(self, board_id):
         self.conn.row_factory = self.dict_factory
-        row = self.conn.execute('SELECT name, alias FROM board WHERE id=%i' % board_id)
+        row = self.conn.execute('SELECT name, alias FROM board WHERE board_id=%i' % board_id)
         self.conn.row_factory = None
         result = row.fetchone()
         return result
@@ -86,24 +86,24 @@ class Database(object):
             except sqlite3.IntegrityError:
                 pass
         self.conn.row_factory = self.dict_factory
-        rows = self.conn.execute('SELECT name, id, alias FROM board ORDER BY id ASC')
+        rows = self.conn.execute('SELECT name, board_id, alias FROM board ORDER BY board_id ASC')
         self.conn.row_factory = None
         self.hosts = [x for x in rows]
         for item in self.hosts:
             if item['name'] == host or item['alias'] == alias:
-                self.board_id = item['id']
+                self.board_id = item['board_id']
                 break
 
     def updatePosts(self, posts, commit=True):
         fields = ",".join("%s=:%s" % (x, x) for x in self.post_fields)
-        self.conn.executemany('UPDATE post SET %s WHERE id=:id AND board_id=%i' % (fields, self.board_id), posts)
+        self.conn.executemany('UPDATE post SET %s WHERE post_id=:id AND board_id=%i' % (fields, self.board_id), posts)
         if commit:
             self.conn.commit()
 
     def insertPosts(self, posts, commit=True):
         fields = ",".join(self.post_fields)
         values = ",".join(":%s" % x for x in self.post_fields)
-        self.conn.executemany('INSERT INTO post (id,board_id,%s) VALUES(:id,%i,%s)' % (fields, self.board_id, values), posts)
+        self.conn.executemany('INSERT INTO post (post_id,board_id,%s) VALUES(:id,%i,%s)' % (fields, self.board_id, values), posts)
         if commit:
             self.conn.commit()
 
@@ -134,7 +134,7 @@ class Database(object):
     def addPosts(self, posts, update=True):
         id_list = [x['id'] for x in posts]
         placeholders = ', '.join('?' for unused in id_list)
-        rows = self.conn.execute('SELECT id FROM post WHERE board_id=%i AND id IN (%s)' % (self.board_id, placeholders), id_list)
+        rows = self.conn.execute('SELECT post_id FROM post WHERE board_id=%i AND post_id IN (%s)' % (self.board_id, placeholders), id_list)
         exists = [x[0] for x in rows]
         if update:
             upd = [x for x in posts if x['id'] in exists]
@@ -150,7 +150,7 @@ class Database(object):
             return (len(insert), )
 
     def preparePost(self, post):
-        row = self.conn.execute('SELECT tag_name as tags FROM post_tag WHERE post_id =:id AND board_id=:board_id', post)
+        row = self.conn.execute('SELECT tag_name as tags FROM post_tag WHERE post_id=:post_id AND board_id=:board_id', post)
         post['tags'] = [x[0] for x in row]
         post['rating'] = self.ratings[post['rating']]
         host = self.getHost(post['board_id'])
@@ -176,7 +176,7 @@ class Database(object):
         placeholders = ', '.join('?' for unused in tags)
 
         sql = "SELECT * FROM post JOIN post_tag USING (post_id, board_id) WHERE " \
-        "tag_name IN (%s)) GROUP BY md5 ORDER BY id DESC"
+        "tag_name IN (%s)) GROUP BY md5 ORDER BY post_id DESC"
 
         if limit > 0:
             sql += ' LIMIT %i' % limit
@@ -215,13 +215,12 @@ class Database(object):
         extra_sql = self.dictToQuery(extra_items)
 
         if self.board_id:
-            sql = "SELECT * FROM post, post_tag WHERE post.id = post_tag.post_id AND " \
-            "post.board_id=%i AND tag_name IN (%s) GROUP BY md5 " \
+            sql = "SELECT * FROM post JOIN post_tag USING(post_id) " \
+            "WHERE post.board_id=%i AND tag_name IN (%s) GROUP BY md5 " \
             "HAVING COUNT(DISTINCT tag_name) = %i %s"
         else:
-            sql = "SELECT * FROM post, post_tag WHERE post.id = post_tag.post_id AND " \
-            "post.board_id = post_tag.board_id AND tag_name IN (%s) GROUP BY md5 " \
-            "HAVING COUNT(DISTINCT tag_name) = %i %s"
+            sql = "SELECT * FROM post JOIN post_tag USING(post_id, board_id) "\
+            "WHERE tag_name IN (%s) GROUP BY md5 HAVING COUNT(DISTINCT tag_name) = %i %s"
 
         if limit > 0:
             sql += ' LIMIT %i' % limit
@@ -236,19 +235,19 @@ class Database(object):
         self.conn.row_factory = self.dict_factory
         if self.board_id:
             extra_sql = self.dictToQuery(extra_items)
-            rows = self.conn.execute('SELECT * FROM post WHERE board_id=%i %s ORDER BY id DESC LIMIT ? OFFSET ?' % (self.board_id, extra_sql), (limit, offset))
+            rows = self.conn.execute('SELECT * FROM post WHERE board_id=%i %s ORDER BY post_id DESC LIMIT ? OFFSET ?' % (self.board_id, extra_sql), (limit, offset))
         else:
             extra_sql = self.dictToQuery(extra_items, first="WHERE")
-            rows = self.conn.execute('SELECT * FROM post %s GROUP BY md5 ORDER BY id DESC LIMIT ? OFFSET ?' % extra_sql, (limit, offset))
+            rows = self.conn.execute('SELECT * FROM post %s GROUP BY md5 ORDER BY post_id DESC LIMIT ? OFFSET ?' % extra_sql, (limit, offset))
         self.conn.row_factory = None
         return [self.preparePost(data) for data in rows]
 
     def getFiles(self, limit, offset):
         self.conn.row_factory = self.dict_factory
         if self.board_id:
-            rows = self.conn.execute('SELECT file_url, md5 FROM post WHERE board_id=%i ORDER BY id DESC LIMIT ? OFFSET ?' % self.board_id, (limit, offset))
+            rows = self.conn.execute('SELECT file_url, md5 FROM post WHERE board_id=%i ORDER BY post_id DESC LIMIT ? OFFSET ?' % self.board_id, (limit, offset))
         else:
-            rows = self.conn.execute('SELECT file_url, md5 FROM post ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))
+            rows = self.conn.execute('SELECT file_url, md5 FROM post ORDER BY post_id DESC LIMIT ? OFFSET ?', (limit, offset))
         return [file for file in rows]
 
     def deletePostsByTags(self, blacklist, whitelist):
@@ -256,8 +255,8 @@ class Database(object):
             self.conn.row_factory = self.dict_factory
             placeholders = ', '.join('?' for unused in blacklist)
             if not whitelist:
-                sql = "DELETE FROM post, post_tag WHERE post.id = post_tag.post_id " \
-                "AND post.board_id = post_tag.board_id AND post_tag.tag_name IN (%s)"
+                sql = "DELETE FROM post JOIN post_tag USING(post_id, board_id) " \
+                "WHERE post_tag.tag_name IN (%s)"
 
                 self.conn.executemany(sql % placeholders, blacklist)
                 self.conn.executemany("DELETE FROM post_tag WHERE tag_name IN (%s)" % placeholders, blacklist)
@@ -267,7 +266,7 @@ class Database(object):
                 blacklist.extend(whitelist)
 
                 sql = "DELETE FROM post WHERE EXISTS (SELECT 1 FROM post_tag WHERE " \
-                "post.id = post_tag.post_id AND post.board_id = post_tag.board_id " \
+                "post.post_id = post_tag.post_id AND post.board_id = post_tag.board_id " \
                 "AND post_tag.tag_name IN (%s) AND post_tag.post_id NOT IN " \
                 "(SELECT post_id FROM post_tag WHERE tag_name IN (%s) GROUP BY post_id))"
 
