@@ -233,10 +233,19 @@ class Daemon(object):
             sys.exit(1)
 
         while not self._stop:
-            if cfg.fetch_mode == "id":
-                post_list = board.getPostsBefore(last_id, args.tags, cfg.limit, args.blacklist, args.whitelist)
-            elif cfg.fetch_mode == "page":
-                post_list = board.getPostsPage(args.tags, page, cfg.limit, args.blacklist, args.whitelist)
+            retries = 0
+            while retries < 3:
+                try:
+                    if cfg.fetch_mode == "id":
+                        post_list = board.getPostsBefore(last_id, args.tags, cfg.limit, args.blacklist, args.whitelist)
+                    elif cfg.fetch_mode == "page":
+                        post_list = board.getPostsPage(args.tags, page, cfg.limit, args.blacklist, args.whitelist)
+                    break
+                except DanbooruError as e:
+                    logging.error('>>> %s' % e.message)
+                retries += 1
+                logging.warning('Retrying (%i) in 2 seconds...' % retries)
+                sleep(2)
 
             if post_list:
                 result = db.addPosts(post_list)

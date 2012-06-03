@@ -75,40 +75,40 @@ class Api(object):
         self._wait()
         try:
             response = urlopen(url)
-            results = response.read().decode('utf8')
-            posts = json.loads(results)
-            for post in posts:
-                #remove all extra spaces
-                post['tags'] = re.sub(' +', ' ', post['tags']).split(' ')
-                #remove duplicates
-                post['tags'] = list(set(post['tags']))
-                if not "has_comments" in post:
-                    post['has_comments'] = None
-                if not "has_notes" in post:
-                    post['has_notes'] = None
-                if "created_at" in post and isinstance(post['created_at'], dict):
-                    post['created_at'] = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime(post['created_at']['s']))
+        except URLError as e:
+            raise DanbooruError("%s (%s)" % (e.reason, self.host))
+        except HTTPError as e:
+            raise DanbooruError("Error %i: %s" % (e.code, e.msg))
+        except BadStatusLine as e:
+            raise DanbooruError("Error: Cannot fetch from %s" % url)
 
-            if blacklist:
-                post_count = len(posts)
-                # delete posts that have tags in blacklist
-                if whitelist:
-                    # but exclude those in the whitelist
-                    posts[:] = [x for x in posts if not set(x['tags']).intersection(blacklist) or set(x['tags']).intersection(whitelist)]
-                else:
-                    posts[:] = [x for x in posts if not set(x['tags']).intersection(blacklist) or set(x['tags'])]
-                post_count = post_count - len(posts)
-                if post_count > 0:
-                    logging.debug("%i posts filtered by the blacklist" % post_count)
+        results = response.read().decode('utf8')
+        posts = json.loads(results)
+        for post in posts:
+            #remove all extra spaces
+            post['tags'] = re.sub(' +', ' ', post['tags']).split(' ')
+            #remove duplicates
+            post['tags'] = list(set(post['tags']))
+            if not "has_comments" in post:
+                post['has_comments'] = None
+            if not "has_notes" in post:
+                post['has_notes'] = None
+            if "created_at" in post and isinstance(post['created_at'], dict):
+                post['created_at'] = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime(post['created_at']['s']))
 
-            return posts
-        except (URLError, HTTPError, BadStatusLine) as e:
-            if isinstance(e, HTTPError):
-                raise DanbooruError("Error %i: %s" % (e.code, e.msg))
-            elif isinstance(e, BadStatusLine):
-                raise DanbooruError("Error: Cannot fetch from %s" % url)
+        if blacklist:
+            post_count = len(posts)
+            # delete posts that have tags in blacklist
+            if whitelist:
+                # but exclude those in the whitelist
+                posts[:] = [x for x in posts if not set(x['tags']).intersection(blacklist) or set(x['tags']).intersection(whitelist)]
             else:
-                raise DanbooruError("%s (%s)" % (e.reason, self.host))
+                posts[:] = [x for x in posts if not set(x['tags']).intersection(blacklist) or set(x['tags'])]
+            post_count = post_count - len(posts)
+            if post_count > 0:
+                logging.debug("%i posts filtered by the blacklist" % post_count)
+
+        return posts
 
     def tagList(self, name):
         self._wait()
@@ -118,8 +118,9 @@ class Api(object):
             results = response.read().decode('utf8')
             tags = json.loads(results)
             return tags
-        except (HTTPError, URLError) as e:
-            if isinstance(e, HTTPError):
-                raise DanbooruError("Error %i: %s" % (e.code, e.msg))
-            else:
-                raise DanbooruError("%s (%s)" % (e.reason, self.host))
+        except URLError as e:
+            raise DanbooruError("%s (%s)" % (e.reason, self.host))
+        except HTTPError as e:
+            raise DanbooruError("Error %i: %s" % (e.code, e.msg))
+        except BadStatusLine as e:
+            raise DanbooruError("Error: Cannot fetch from %s" % url)
