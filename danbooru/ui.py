@@ -20,6 +20,7 @@ from PyQt4 import QtCore, QtGui
 from os.path import basename, splitext, exists, join, expanduser
 
 from danbooru import utils
+from danbooru.database import Database
 
 
 class ThumbnailCache(object):
@@ -63,16 +64,20 @@ class ThumbnailCache(object):
 
 class ThumbnailWorker(QtCore.QThread):
 
-    makeIconSignal = QtCore.pyqtSignal(QtGui.QListWidgetItem, QtGui.QImage)
+    makeIconSignal = QtCore.pyqtSignal(dict, QtGui.QImage)
     abort = False
 
-    def __init__(self, ListWidget, basedir, parent=None):
+    def __init__(self, ListWidget, basedir, dbname, parent=None):
         QtCore.QThread.__init__(self, parent)
         self.widget = ListWidget
+        self.dbname = dbname
         self.basedir = basedir
         user_path = expanduser("~")
         self.thumbnail_dir = join(user_path, ".cache/danbooru-daemon/thumbnails")
         makedirs(self.thumbnail_dir, exist_ok=True)
+
+    def setQuery(self, query):
+        self.query = query
 
     def stop(self):
         self.abort = True
@@ -80,14 +85,26 @@ class ThumbnailWorker(QtCore.QThread):
     def run(self):
         self.abort = False
         th = ThumbnailCache(self.thumbnail_dir)
-        generator = utils.list_generator(self.widget)
-        for item in generator:
+
+        db = Database(self.dbname)
+        if self.query.get('site'):
+            db.setHost(host=None, alias=self.query['site'])
+        else:
+            db.clearHost()
+
+        if self.query.get('tags'):
+            posts = db.getANDPosts(self.query['tags'], limit=200, extra_items=self.query)
+        else:
+            posts = db.getPosts(200, extra_items=self.query)
+
+        self.widget.clear()
+
+        for post in posts:
             if self.abort:
                 break
-            post = item.data(QtCore.Qt.UserRole)
             full_path = utils.post_abspath(self.basedir, post)
             image = th.getThumbnail(full_path)
-            self.makeIconSignal.emit(item, image)
+            self.makeIconSignal.emit(post, image)
 
 
 def getScaledPixmap(image, size):

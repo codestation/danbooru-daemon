@@ -21,7 +21,6 @@ from os.path import join, expanduser
 from PyQt4 import QtCore, QtGui, uic
 
 from danbooru import utils, ui
-from danbooru.database import Database
 from danbooru.settings import Settings
 
 
@@ -75,7 +74,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
 
         # Other setup
-        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
+        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR, self.dbname)
         self.thumb.makeIconSignal.connect(self.makeIcon)
 
         # Add clear button on queryBox
@@ -107,8 +106,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         if not cfg.dbname:
             daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
             cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
-        dbname = join(daemon_dir, cfg.dbname)
-        self.db = Database(dbname)
+        self.dbname = join(daemon_dir, cfg.dbname)
 
     def itemOver(self, item_img):
         pass
@@ -162,12 +160,14 @@ class DanbooruGUI(QtGui.QMainWindow):
         full_path = utils.post_abspath(self.BASE_DIR, post)
         self.previewWidget.setPixmap(QtGui.QPixmap(full_path))
 
-    def makeIcon(self, item, image):
+    def makeIcon(self, post, image):
+        item = self.addItem(post)
         value = self.zoomSlider.value() * self.SLIDER_MULT
         pixmap = QtGui.QPixmap(value, value)
         pixmap.convertFromImage(image)
         icon = QtGui.QIcon(pixmap)
         item.setIcon(icon)
+        self.statusLabel.setText(self.tr("Found %i images") % self.listWidget.count())
 
     def sliderMove(self, value):
         value *= self.SLIDER_MULT
@@ -186,36 +186,32 @@ class DanbooruGUI(QtGui.QMainWindow):
         value = self.zoomSlider.value() * self.SLIDER_MULT
         item.setSizeHint(QtCore.QSize(value + 32, value + 32))
         self.listWidget.addItem(item)
+        return item
 
     def startSearch(self):
         text = self.queryBox.text().strip()
-        if text:
-            query = utils.parseQuery(text)
-            if isinstance(query, str):
-                self.statusLabel.setText(self.tr("Error in term: %s") % query)
-                return
 
-            if query.get('site'):
-                self.db.setHost(host=None, alias=query['site'])
-            else:
-                if query.get('rating'):
-                    self.statusLabel.setText(self.tr("Search by rating depends on site"))
-                    return
-                self.db.clearHost()
-            self.thumb.stop()
-            self.thumb.wait()
-            self.listWidget.clear()
-            self.statusLabel.setText(self.tr("Processing..."))
-            if query.get('tags'):
-                posts = self.db.getANDPosts(query['tags'], limit=200, extra_items=query)
-            else:
-                posts = self.db.getPosts(200, extra_items=query)
-            for post in posts:
-                self.addItem(post)
-            self.statusLabel.setText(self.tr("Found %i images") % len(posts))
-            size = self.zoomSlider.value() * self.SLIDER_MULT
-            self.listWidget.setIconSize(QtCore.QSize(size, size))
-            self.thumb.start()
+        if not text:
+            return
+
+        query = utils.parseQuery(text)
+        if isinstance(query, str):
+            self.statusLabel.setText(self.tr("Error in term: %s") % query)
+            return
+
+        if not query.get('site') and query.get('rating'):
+            self.statusLabel.setText(self.tr("Search by rating depends on site"))
+            return
+
+        self.thumb.stop()
+        self.thumb.wait()
+
+        self.statusLabel.setText(self.tr("Processing..."))
+        self.thumb.setQuery(query)
+
+        size = self.zoomSlider.value() * self.SLIDER_MULT
+        self.listWidget.setIconSize(QtCore.QSize(size, size))
+        self.thumb.start()
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
