@@ -22,7 +22,7 @@ import logging
 
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
-from http.client import BadStatusLine
+from http.client import HTTPException
 from time import sleep, time, gmtime, strftime
 
 from danbooru.error import DanbooruError
@@ -73,14 +73,15 @@ class Api(object):
 
     def getPosts(self, url, blacklist, whitelist):
         self._wait()
+
         try:
             response = urlopen(url)
         except URLError as e:
             raise DanbooruError("%s (%s)" % (e.reason, self.host))
         except HTTPError as e:
             raise DanbooruError("Error %i: %s" % (e.code, e.msg))
-        except BadStatusLine as e:
-            raise DanbooruError("Error: Cannot fetch from %s" % url)
+        except HTTPException as e:
+            raise DanbooruError("Error: HTTPException")
 
         results = response.read().decode('utf8')
         posts = json.loads(results)
@@ -122,5 +123,5 @@ class Api(object):
             raise DanbooruError("%s (%s)" % (e.reason, self.host))
         except HTTPError as e:
             raise DanbooruError("Error %i: %s" % (e.code, e.msg))
-        except BadStatusLine as e:
-            raise DanbooruError("Error: Cannot fetch from %s" % url)
+        except HTTPException as e:
+            raise DanbooruError("Error: HTTPException")
