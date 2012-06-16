@@ -76,6 +76,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         # Other setup
         self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR, self.dbname)
         self.thumb.makeIconSignal.connect(self.makeIcon)
+        self.thumb.setStatusSignal.connect(self.setStatus)
 
         # Add clear button on queryBox
         self.clearButton = QtGui.QPushButton(self.queryBox)
@@ -168,6 +169,9 @@ class DanbooruGUI(QtGui.QMainWindow):
         icon = QtGui.QIcon(pixmap)
         item.setIcon(icon)
         self.statusLabel.setText(self.tr("Found %i images") % self.listWidget.count())
+
+    def setStatus(self):
+        self.statusLabel.setText(self.tr("No results"))
 
     def sliderMove(self, value):
         value *= self.SLIDER_MULT

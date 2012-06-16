@@ -225,7 +225,7 @@ class Database(object):
         if limit > 0:
             sql += ' LIMIT %i' % limit
         if self.board_id:
-            rows = self.conn.execute(sql % (self.board_id, self.board_id, placeholders, len(tags), extra_sql), tags)
+            rows = self.conn.execute(sql % (self.board_id, placeholders, len(tags), extra_sql), tags)
         else:
             rows = self.conn.execute(sql % (placeholders, len(tags), extra_sql), tags)
         self.conn.row_factory = None

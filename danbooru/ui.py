@@ -65,6 +65,7 @@ class ThumbnailCache(object):
 class ThumbnailWorker(QtCore.QThread):
 
     makeIconSignal = QtCore.pyqtSignal(dict, QtGui.QImage)
+    setStatusSignal = QtCore.pyqtSignal()
     abort = False
 
     def __init__(self, ListWidget, basedir, dbname, parent=None):
@@ -99,12 +100,15 @@ class ThumbnailWorker(QtCore.QThread):
 
         self.widget.clear()
 
-        for post in posts:
-            if self.abort:
-                break
-            full_path = utils.post_abspath(self.basedir, post)
-            image = th.getThumbnail(full_path)
-            self.makeIconSignal.emit(post, image)
+        if not posts:
+            self.setStatusSignal.emit()
+        else:
+            for post in posts:
+                if self.abort:
+                    break
+                full_path = utils.post_abspath(self.basedir, post)
+                image = th.getThumbnail(full_path)
+                self.makeIconSignal.emit(post, image)
 
 
 def getScaledPixmap(image, size):
