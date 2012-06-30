@@ -29,6 +29,7 @@ from danbooru.api import Api
 from danbooru.database import Database
 from danbooru.settings import Settings
 from danbooru.downloader import Downloader
+from danbooru.utils import parseQuery
 
 
 class Daemon(object):
@@ -109,11 +110,18 @@ class Daemon(object):
                 args.whitelist = []
             args.whitelist = args.whitelist + list(set(whitelist_tags) - set(args.whitelist))
 
+        query = parseQuery(args.tags)
+        if isinstance(query, str):
+            logging.error("Error in config file, malformed query: %s" % query)
+            sys.exit(1)
+
         # cut down the tag list if it have too much items
         max_tags_number = cfg.max_tags
-        if args.tags and len(args.tags) > max_tags_number:
+        if query['tags'] and len(query['tags']) > max_tags_number:
             logging.warning('Using more than %i tags, cutting down list' % max_tags_number)
-            args.tags = args.tags[:max_tags_number]
+            query['tags'] = query['tags'][:max_tags_number]
+
+        return query
 
     def abort(self):
         self._stop = True
@@ -130,12 +138,12 @@ class Daemon(object):
         logging.info('Ctrl+C detected, shutting down...')
         self.abort()
 
-    def getLastId(self, tags, board, before_id=None):
+    def getLastId(self, tag, query, board, before_id=None):
         if before_id:
             return int(before_id)
         else:
             try:
-                posts = board.getPostsPage(tags, 1, 1)
+                posts = board.getPostsPage(tag, query, 1, 1)
                 if posts:
                     return posts[0]['id'] + 1
                 else:
@@ -156,7 +164,9 @@ class Daemon(object):
         logging.basicConfig(level=cfg.log_level, filename=cfg.log_file,
                             format='%(asctime)s %(levelname)s: %(message)s',
                             datefmt='%I:%M:%S %p')
-        self.parseTags(args, cfg)
+
+        self.query = self.parseTags(args, cfg)
+
         signal.signal(signal.SIGINT, self.signalHandler)
 
         if not cfg.dbname:
@@ -171,7 +181,9 @@ class Daemon(object):
             self.run_daemon(args, db)
         elif args.action == "update":
             board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
-            self.run_update(args, cfg, board, db)
+            for tag in self.query:
+                logging.debug("processing tag [%s]" % tag)
+                self.run_update(args, tag, cfg, board, db)
         elif args.action == "download":
             self.run_download(cfg, db)
         elif args.action == "nepomuk":
@@ -204,9 +216,11 @@ class Daemon(object):
                 db.setHost(cfg.host, section)
                 board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
                 logging.debug("Run upload mode for %s" % section)
-                self.run_update(args, cfg, board, db)
-                if self._stop:
-                    return
+                for tag in self.query['tags']:
+                    logging.debug("processing tag [%s]" % tag)
+                    self.run_update(args, tag, cfg, board, db)
+                    if self._stop:
+                        return
                 logging.debug("Run download mode for %s" % section)
                 self.run_download(cfg, db)
                 if self._stop:
@@ -217,13 +231,13 @@ class Daemon(object):
             logging.debug("Waiting for %i seconds" % sleep_time)
             sleep(sleep_time)
 
-    def run_update(self, args, cfg, board, db):
+    def run_update(self, args, tag, cfg, board, db):
         if not args.tags:
             logging.error('No tags specified. Aborting.')
             sys.exit(1)
 
         if cfg.fetch_mode == "id":
-            last_id = self.getLastId(args.tags, board, args.before_id)
+            last_id = self.getLastId(tag, self.query, board, args.before_id)
             logging.debug('Fetching posts below id: %i' % last_id)
         elif cfg.fetch_mode == "page":
             page = 1
@@ -237,9 +251,9 @@ class Daemon(object):
             while retries < 3:
                 try:
                     if cfg.fetch_mode == "id":
-                        post_list = board.getPostsBefore(last_id, args.tags, cfg.limit, args.blacklist, args.whitelist)
+                        post_list = board.getPostsBefore(last_id, tag, self.query, cfg.limit, args.blacklist, args.whitelist)
                     elif cfg.fetch_mode == "page":
-                        post_list = board.getPostsPage(args.tags, page, cfg.limit, args.blacklist, args.whitelist)
+                        post_list = board.getPostsPage(tag, self.query, page, cfg.limit, args.blacklist, args.whitelist)
                     break
                 except DanbooruError as e:
                     logging.error('>>> %s' % e.message)

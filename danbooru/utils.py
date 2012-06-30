@@ -57,7 +57,12 @@ def parseDimension(term, dim):
 def parseQuery(text):
     query = {}
     query['tags'] = []
-    items = re.sub(' +', ' ', text).split(' ')
+
+    if isinstance(text, list):
+        items = text
+    else:
+        items = re.sub(' +', ' ', text).split(' ')
+
     try:
         for item in items:
             if item.startswith("site:"):
@@ -93,3 +98,35 @@ def find_resource(base, filename):
             return full_path
 
     raise Exception("%s cannot be found." % filename)
+
+
+def filter_posts(posts, query):
+
+    if query.get('rating'):
+        posts[:] = [post for post in posts if post['rating'] == query['rating']]
+
+    if query.get('width'):
+        if query['width_type'] == "=":
+            posts[:] = [post for post in posts if post['width'] == query['width']]
+        if query['width_type'] == "<":
+            posts[:] = [post for post in posts if post['width'] < query['width']]
+        if query['width_type'] == ">":
+            posts[:] = [post for post in posts if post['width'] > query['width']]
+
+    if query.get('height'):
+        if query['height_type'] == "=":
+            posts[:] = [post for post in posts if post['height'] == query['height']]
+        if query['height_type'] == "<":
+            posts[:] = [post for post in posts if post['height'] < query['height']]
+        if query['height_type'] == ">":
+            posts[:] = [post for post in posts if post['height'] > query['height']]
+
+    if query.get('ratio'):
+        posts[:] = [post for post in posts if post['width'] * 1.0 / post['height'] ==
+                    query['ratio_width'] * 1.0 / query['ratio_height']]
+    return posts
+
+
+def remove_duplicates(self, posts):
+    posts[:] = list(dict((x['id'], x) for x in posts).values())
+    return sorted(posts, key=lambda k: k['id'], reverse=True)

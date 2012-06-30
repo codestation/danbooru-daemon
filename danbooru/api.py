@@ -26,6 +26,8 @@ from http.client import HTTPException
 from time import sleep, time, gmtime, strftime
 
 from danbooru.error import DanbooruError
+from danbooru.utils import filter_posts
+from socket import socket
 
 
 class Api(object):
@@ -56,26 +58,26 @@ class Api(object):
             self._login_string = '&login=%s&password_hash=%s' % (self.username, sha1_password)
         return self._login_string
 
-    def getPostsPage(self, tags, page, limit, blacklist=None, whitelist=None):
-        tags = ','.join(tags)
+    def getPostsPage(self, tag, query, page, limit, blacklist=None, whitelist=None):
         url = "%s%s?tags=%s&page=%i&limit=%i" % (self.host, self.post_api,
-              tags, page, limit) + self._loginData()
-        return self.getPosts(url, blacklist, whitelist)
+            tag, page, limit) + self._loginData()
+        return self.getPosts(url, query, blacklist, whitelist)
 
-    def getPostsBefore(self, post_id, tags, limit, blacklist=None, whitelist=None):
-        tags = ','.join(tags)
+    def getPostsBefore(self, post_id, tag, query, limit, blacklist=None, whitelist=None):
         url = "%s%s?before_id=%i&tags=%s&limit=%i" % (self.host, self.post_api,
-              post_id, tags, limit) + self._loginData()
-        return self.getPosts(url, blacklist, whitelist)
+              post_id, tag, limit) + self._loginData()
+        return self.getPosts(url, query, blacklist, whitelist)
 
     def getTagsBefore(self, post_id, tags, limit):
         pass
 
-    def getPosts(self, url, blacklist, whitelist):
+    def getPosts(self, url, query, blacklist, whitelist):
         self._wait()
 
         try:
             response = urlopen(url)
+        except socket.error as e:
+            raise DanbooruError("Error: %s" % e.reason)
         except URLError as e:
             raise DanbooruError("%s (%s)" % (e.reason, self.host))
         except HTTPError as e:
@@ -109,7 +111,7 @@ class Api(object):
             if post_count > 0:
                 logging.debug("%i posts filtered by the blacklist" % post_count)
 
-        return posts
+        return filter_posts(posts, query)
 
     def tagList(self, name):
         self._wait()
