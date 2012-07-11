@@ -22,6 +22,7 @@ from PyQt4 import QtCore, QtGui, uic
 
 from danbooru import utils, ui
 from danbooru.settings import Settings
+from danbooru.database import Database
 
 
 class DanbooruGUI(QtGui.QMainWindow):
@@ -74,9 +75,10 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
 
         # Other setup
-        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR, self.dbname)
+        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
         self.thumb.makeIconSignal.connect(self.makeIcon)
         self.thumb.setStatusSignal.connect(self.setStatus)
+        self.thumb.clearWidgetListSignal.connect(self.clearWidgetList)
 
         # Add clear button on queryBox
         self.clearButton = QtGui.QPushButton(self.queryBox)
@@ -107,7 +109,10 @@ class DanbooruGUI(QtGui.QMainWindow):
         if not cfg.dbname:
             daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
             cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
-        self.dbname = join(daemon_dir, cfg.dbname)
+        self.db = Database(join(daemon_dir, cfg.dbname))
+
+    def clearWidgetList(self):
+        self.listWidget.clear()
 
     def itemOver(self, item_img):
         pass
@@ -138,16 +143,19 @@ class DanbooruGUI(QtGui.QMainWindow):
             item = items[0]
             self.nameLabel.setText(self.tr("1 selected item"))
             post = item.data(QtCore.Qt.UserRole)
-            full_path = utils.post_abspath(self.BASE_DIR, post)
+            sess = self.db.DBsession()
+            post = sess.merge(post)
+            img = post.image
+            full_path = join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
             self.img = QtGui.QImage(full_path)
             self.updatePreview()
-            tags = ['<a href="%s">%s</a>' % (tag, tag) for tag in post['tags']]
+            tags = ['<a href="%s">%s</a>' % (tag.name, tag.name) for tag in post.tags]
             tags = " ".join(tags)
             str_format = self.info_format % self.info_values
             self.infoLabel.setText(str_format %
-                (post['width'], post['width'], post['height'], post['height'],
-                 tags, post['rating'], post['rating'], post['score'],
-                 post['board_url'], post['post_id']))
+                (img.width, img.width, img.height, img.height,
+                 tags, post.rating, post.rating, post.score,
+                 post.board.host, post.post_id))
         else:
             self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None
@@ -158,7 +166,7 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     def itemClicked(self, item):
         post = item.data(QtCore.Qt.UserRole)
-        full_path = utils.post_abspath(self.BASE_DIR, post)
+        full_path = join(self.BASE_DIR, post.md5[0], post.md5 + post.file_ext)
         self.previewWidget.setPixmap(QtGui.QPixmap(full_path))
 
     def makeIcon(self, post, image):
@@ -183,7 +191,7 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     def addItem(self, post):
         item = QtGui.QListWidgetItem()
-        item.setText(utils.post_basename(post))
+        item.setText(join(post.image.md5[0], post.image.md5 + post.image.file_ext))
         item.setIcon(QtGui.QIcon().fromTheme("image-x-generic"))
         item.setData(QtCore.Qt.UserRole, post)
         item.setTextAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignBottom)
@@ -211,7 +219,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.thumb.wait()
 
         self.statusLabel.setText(self.tr("Processing..."))
-        self.thumb.setQuery(query)
+        self.thumb.setData(query, self.db)
 
         size = self.zoomSlider.value() * self.SLIDER_MULT
         self.listWidget.setIconSize(QtCore.QSize(size, size))

@@ -2,6 +2,11 @@ Danbooru-daemon comprises a daemon to download images automatically from
 danbooru-like sites and an offline browser GUI to search the downloaded
 images by tags and other fields, licensed under Apache License 2.0.
 
+Dependencies:
+Python 3.x
+SQLAlchemy >= 0.7.7
+PyQt4 >= 4.9.0
+
 First use:
 * Copy the sample-config.cfg to ~/.danbooru-daemon.cfg and adapt it for
   your needs.

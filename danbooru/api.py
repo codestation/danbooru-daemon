@@ -27,7 +27,6 @@ from time import sleep, time, gmtime, strftime
 
 from danbooru.error import DanbooruError
 from danbooru.utils import filter_posts
-from socket import socket
 
 
 class Api(object):
@@ -76,8 +75,6 @@ class Api(object):
 
         try:
             response = urlopen(url)
-        except socket.error as e:
-            raise DanbooruError("Error: %s" % e.reason)
         except URLError as e:
             raise DanbooruError("%s (%s)" % (e.reason, self.host))
         except HTTPError as e:
@@ -88,6 +85,9 @@ class Api(object):
         results = response.read().decode('utf8')
         posts = json.loads(results)
         for post in posts:
+            # rename key id -> post_id
+            post['post_id'] = post['id']
+            del post['id']
             #remove all extra spaces
             post['tags'] = re.sub(' +', ' ', post['tags']).split(' ')
             #remove duplicates
@@ -111,7 +111,10 @@ class Api(object):
             if post_count > 0:
                 logging.debug("%i posts filtered by the blacklist" % post_count)
 
-        return filter_posts(posts, query)
+        if query:
+            return filter_posts(posts, query)
+        else:
+            return posts
 
     def tagList(self, name):
         self._wait()

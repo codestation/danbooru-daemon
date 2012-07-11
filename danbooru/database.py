@@ -16,263 +16,181 @@
 #   limitations under the License.
 
 import os
-import sqlite3
-import danbooru
-from danbooru import utils
+
+from sqlalchemy import event
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.engine import create_engine
+from sqlalchemy.orm.session import sessionmaker
+from sqlalchemy.sql.expression import func, ClauseElement, distinct
+
+from danbooru.models import Board, Post, Image, Tag, Base
 
 
 class Database(object):
 
-    ratings = {'s': 'safe', 'q': 'questionable', 'e': 'explicit'}
+    def __init__(self, dbname=""):
+        # prepare the engine
+        self.engine = create_engine("sqlite:///%s" % dbname)
 
-    post_fields = [
-                 'author',
-                 'change',
-                 'created_at',
-                 'creator_id',
-                 'file_size',
-                 'file_url',
-                 'has_children',
-                 'has_comments',  # !konachan
-                 'has_notes',  # !konachan
-                 'height',
-                 'md5',
-                 'parent_id',
-                 'preview_height',
-                 'preview_url',
-                 'preview_width',
-                 'rating',
-                 'sample_height',
-                 'sample_url',
-                 'sample_width',
-                 'score',
-                 'source',
-                 'status',
-                 'width'
-                ]
+        # enable foreign key support on sqlite
+        def _fk_pragma_on_connect(dbapi_con, con_record):  # @UnusedVariable
+            dbapi_con.execute('pragma foreign_keys=ON')
+        event.listen(self.engine, 'connect', _fk_pragma_on_connect)
 
-    def __init__(self, dbname):
-        self.dbname = dbname
-        self.conn = sqlite3.connect(dbname)
-        self.board_id = None
-        try:
-            f = open(utils.find_resource(danbooru.__file__, "data/danbooru-db.sql"))
-            self.conn.executescript(f.read())
-            self.conn.commit()
-        except IOError:
-            pass
+        # create the tables
+        Base.metadata.create_all(bind=self.engine)  # @UndefinedVariable
 
-    def dict_factory(self, cursor, row):
-        d = {}
-        for idx, col in enumerate(cursor.description):
-            d[col[0]] = row[idx]
-        return d
+        # create a session
+        self.DBsession = scoped_session(
+            sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=self.engine
+            )
+        )
+
+    def _clean_post(self, model, post):
+        clean = [x.name for x in model.__mapper__.columns]
+        return {key: value for key, value in post.items() if key in clean}
+
+    def _get_or_create(self, session, model, defaults=None, **kwargs):
+        instance = session.query(model).filter_by(**kwargs).first()
+        if instance:
+            return instance, False
+        else:
+            params = dict((k, v) for k, v in kwargs.items() if not isinstance(v, ClauseElement))
+            if defaults:
+                params.update(defaults)
+            instance = model(**params)
+            session.add(instance)
+            return instance, True
+
+    def _dict2query(self, query, items):
+        q = query.join(Post.image)
+        if items.get("width"):
+            if items['width_type'] == "<":
+                q = q.filter(Image.width < items['width'])
+            elif items['width_type'] == ">":
+                q = query.filter(Image.width > items['width'])
+            else:
+                q = query.filter(Image.width == items['width'])
+
+        elif items.get("height"):
+            if items['height_type'] == "<":
+                q = q.filter(Image.width < items['height'])
+            elif items['height_type'] == ">":
+                q = query.filter(Image.width > items['height'])
+            else:
+                q = query.filter(Image.width == items['height'])
+
+        elif items.get("rating"):
+            q = q.filter(Post.rating == items['rating'])
+
+        elif items.get("ratio"):
+            ratio = items['ratio_width'] * 1.0 / items['ratio_height']
+            q = q.filter(Image.width * 1.0 / Image.height == ratio)
+
+        return q
 
     def clearHost(self):
-        self.board_id = None
-
-    def getHost(self, board_id):
-        self.conn.row_factory = self.dict_factory
-        row = self.conn.execute('SELECT name, alias FROM board WHERE board_id=%i' % board_id)
-        self.conn.row_factory = None
-        result = row.fetchone()
-        return result
+        self.board = None
 
     def setHost(self, host, alias):
-        if host:
-            try:
-                self.conn.execute('INSERT INTO board (name, alias) VALUES (?, ?)', (host, alias))
-                self.conn.commit()
-            except sqlite3.IntegrityError:
-                pass
-        self.conn.row_factory = self.dict_factory
-        rows = self.conn.execute('SELECT name, board_id, alias FROM board ORDER BY board_id ASC')
-        self.conn.row_factory = None
-        self.hosts = [x for x in rows]
-        for item in self.hosts:
-            if item['name'] == host or item['alias'] == alias:
-                self.board_id = item['board_id']
-                break
+        s = self.DBsession()
+        board, created = self._get_or_create(s, Board, **{'host': host, 'alias': alias})
+        if created:
+            s.add(board)
+            s.commit()
+        self.board = board
 
-    def updatePosts(self, posts, commit=True):
-        fields = ",".join("%s=:%s" % (x, x) for x in self.post_fields)
-        self.conn.executemany('UPDATE post SET %s WHERE post_id=:id AND board_id=%i' % (fields, self.board_id), posts)
-        if commit:
-            self.conn.commit()
+    def savePosts(self, posts):
+        results = {'tags': 0, 'images': 0, 'posts': 0}
+        s = self.DBsession()
 
-    def insertPosts(self, posts, commit=True):
-        fields = ",".join(self.post_fields)
-        values = ",".join(":%s" % x for x in self.post_fields)
-        self.conn.executemany('INSERT INTO post (post_id,board_id,%s) VALUES(:id,%i,%s)' % (fields, self.board_id, values), posts)
-        if commit:
-            self.conn.commit()
-
-    def deleteTags(self, post_id, tags, commit=True):
-        self.conn.executemany('DELETE FROM post_tag WHERE post_id=%i AND board_id=%i AND tag_name=?' % (post_id, self.board_id), tags)
-        if commit:
-            self.conn.commit()
-
-    def insertTags(self, post_id, tags, commit=True):
-        self.conn.executemany('INSERT INTO post_tag (post_id, board_id, tag_name) VALUES (%i, %i, ?)' % (post_id, self.board_id), [(x,) for x in tags])
-        if commit:
-            self.conn.commit()
-
-    def addTags(self, posts, delete=True, commit=True):
         for post in posts:
-            rows = self.conn.execute('SELECT tag_name, post_id FROM post_tag WHERE post_id=:id AND board_id=%i' % self.board_id, post)
-            exists = [x[0] for x in rows]
-            ins = [x for x in post['tags'] if x not in exists]
-            if ins:
-                self.insertTags(post['id'], ins, commit)
-            if delete:
-                dele = [(x,) for x in exists if x not in post['tags']]
-                if dele:
-                    self.deleteTags(post['id'], dele, commit)
-        if commit:
-            self.conn.commit()
+            #fix file extension
+            defaults = {'file_ext': os.path.splitext(post['file_url'])[1]}
+            if defaults['file_ext'] == ".jpeg":
+                defaults['file_ext'] = ".jpg"
 
-    def addPosts(self, posts, update=True):
-        id_list = [x['id'] for x in posts]
-        placeholders = ', '.join('?' for unused in id_list)
-        rows = self.conn.execute('SELECT post_id FROM post WHERE board_id=%i AND post_id IN (%s)' % (self.board_id, placeholders), id_list)
-        exists = [x[0] for x in rows]
-        if update:
-            upd = [x for x in posts if x['id'] in exists]
-            self.updatePosts(upd, commit=False)
+            clean_image = self._clean_post(Image, post)
+            defaults.update(clean_image)
 
-        insert = [x for x in posts if not x['id'] in exists]
-        self.insertPosts(insert, commit=False)
-        self.addTags(posts, commit=False)
-        self.conn.commit()
-        if update:
-            return (len(insert), len(upd))
-        else:
-            return (len(insert), )
+            img, created = self._get_or_create(s, Image, defaults, **{'md5': post['md5']})
+            results['images'] += int(created)
 
-    def preparePost(self, post):
-        row = self.conn.execute('SELECT tag_name as tags FROM post_tag WHERE post_id=:post_id AND board_id=:board_id', post)
-        post['tags'] = [x[0] for x in row]
-        post['rating'] = self.ratings[post['rating']]
-        host = self.getHost(post['board_id'])
-        post['board_url'] = host['name']
-        post['board_alias'] = host['alias']
-        return post
+            tags = [self._get_or_create(s, Tag, **{'name': v}) for v in post['tags']]
+            results['tags'] += sum(created for tag, created in tags)
+
+            defaults = {'image': img, 'tags': [tag for tag, created in tags]}
+            clean_post = self._clean_post(Post, post)
+            defaults.update(clean_post)
+
+            # avoid search by post_id
+            del defaults['post_id']
+
+            new_post, created = self._get_or_create(s, Post, defaults, **{'post_id': post['post_id'], 'board': self.board})
+            results['posts'] += int(created)
+
+            s.add(new_post)
+            s.flush()
+
+        s.commit()
+        return results
 
     def getPost(self, file):
-        for host in self.hosts:
-            self.conn.row_factory = self.dict_factory
-            row = self.conn.execute('SELECT * from post WHERE board_id=%i AND md5 = ?' % host['id'], [os.path.splitext(file)[0]])
-            self.conn.row_factory = None
-            data = row.fetchone()
-            if data:
-                return self.preparePost(data)
+        s = self.DBsession()
+        md5 = os.path.splitext(file)[0]
+        q = s.query(Post).join(Post.image)
+        return q.filter_by(md5=md5).first()
 
     def fileExists(self, md5):
-        row = self.conn.execute('SELECT md5 FROM post WHERE md5=? LIMIT 1', [md5])
-        data = row.fetchone()
-        return bool(data)
+        return bool(self.DBsession().query(Image).filter_by(md5=md5).first())
 
+    #FIXME: unused?
     def getORPosts(self, tags, limit):
-        placeholders = ', '.join('?' for unused in tags)
-
-        sql = "SELECT * FROM post JOIN post_tag USING (post_id, board_id) WHERE " \
-        "tag_name IN (%s)) GROUP BY md5 ORDER BY post_id DESC"
-
-        if limit > 0:
-            sql += ' LIMIT %i' % limit
-        self.conn.row_factory = self.dict_factory
-        rows = self.conn.execute(sql % placeholders, tags)
-        self.conn.row_factory = None
-        return [x for x in rows]
-
-    def dictToQuery(self, items, first="AND"):
-        sql = ""
-        if items:
-            if items.get("width"):
-                sql += "width %s %i" % (items['width_type'], items['width'])
-            if items.get("height"):
-                if sql:
-                    sql += " AND "
-                sql += "height %s %i" % (items['height_type'], items['height'])
-            if items.get("rating"):
-                for char, name in self.ratings.items():
-                    if name == items['rating']:
-                        if sql:
-                            sql += " AND "
-                        sql += "rating = '%s'" % char
-                        break
-            if items.get("ratio"):
-                if sql:
-                    sql += " AND "
-                sql += "width * 1.0 / height = %i * 1.0 / %i" % (items['ratio_width'], items['ratio_height'])
-            if sql:
-                sql = " %s %s" % (first, sql)
-        return sql
+        q = self.DBsession().query(Post).join(Post.tags)
+        q = q.filter(Tag.name.in_(tags)).group_by(Post.image_id)
+        return q.limit(limit).all()
 
     def getANDPosts(self, tags, limit=100, extra_items=None):
-        self.conn.row_factory = self.dict_factory
-        placeholders = ', '.join('?' for unused in tags)
-        extra_sql = self.dictToQuery(extra_items)
-
-        if self.board_id:
-            sql = "SELECT * FROM post JOIN post_tag USING(post_id) " \
-            "WHERE post.board_id=%i AND tag_name IN (%s) GROUP BY md5 " \
-            "HAVING COUNT(DISTINCT tag_name) = %i %s"
-        else:
-            sql = "SELECT * FROM post JOIN post_tag USING(post_id, board_id) "\
-            "WHERE tag_name IN (%s) GROUP BY md5 HAVING COUNT(DISTINCT tag_name) = %i %s"
-
-        if limit > 0:
-            sql += ' LIMIT %i' % limit
-        if self.board_id:
-            rows = self.conn.execute(sql % (self.board_id, placeholders, len(tags), extra_sql), tags)
-        else:
-            rows = self.conn.execute(sql % (placeholders, len(tags), extra_sql), tags)
-        self.conn.row_factory = None
-        return [self.preparePost(data) for data in rows]
+        q = self.DBsession().query(Post).join(Post.tags)
+        if extra_items:
+            q = self._dict2query(q, extra_items)
+        if self.board:
+            q = q.filter_by(board=self.board)
+        q = q.filter(Tag.name.in_(tags)).group_by(Post.image_id)
+        q = q.having(func.count(distinct(Tag.name)) == len(tags))
+        if limit:
+            q = q.limit(limit)
+        return q.all()
 
     def getPosts(self, limit=100, offset=0, extra_items=None):
-        self.conn.row_factory = self.dict_factory
-        if self.board_id:
-            extra_sql = self.dictToQuery(extra_items)
-            rows = self.conn.execute('SELECT * FROM post WHERE board_id=%i %s ORDER BY post_id DESC LIMIT ? OFFSET ?' % (self.board_id, extra_sql), (limit, offset))
-        else:
-            extra_sql = self.dictToQuery(extra_items, first="WHERE")
-            rows = self.conn.execute('SELECT * FROM post %s GROUP BY md5 ORDER BY post_id DESC LIMIT ? OFFSET ?' % extra_sql, (limit, offset))
-        self.conn.row_factory = None
-        return [self.preparePost(data) for data in rows]
+        q = self.DBsession().query(Post)
+        if extra_items:
+            q = self._dict2query(q, extra_items)
+        return q.limit(limit).offset(offset)
 
     def getFiles(self, limit, offset):
-        self.conn.row_factory = self.dict_factory
-        if self.board_id:
-            rows = self.conn.execute('SELECT file_url, md5 FROM post WHERE board_id=%i ORDER BY post_id DESC LIMIT ? OFFSET ?' % self.board_id, (limit, offset))
-        else:
-            rows = self.conn.execute('SELECT file_url, md5 FROM post ORDER BY post_id DESC LIMIT ? OFFSET ?', (limit, offset))
-        return [file for file in rows]
+        q = self.DBsession().query(Post).join(Post.image)
+        if self.board:
+            q = q.filter(Post.board == self.board)
+        return q.limit(limit).offset(offset).all()
 
     def deletePostsByTags(self, blacklist, whitelist):
-        if blacklist:
-            self.conn.row_factory = self.dict_factory
-            placeholders = ', '.join('?' for unused in blacklist)
-            if not whitelist:
-                sql = "DELETE FROM post JOIN post_tag USING(post_id, board_id) " \
-                "WHERE post_tag.tag_name IN (%s)"
+        if not blacklist:
+            return 0
 
-                self.conn.executemany(sql % placeholders, blacklist)
-                self.conn.executemany("DELETE FROM post_tag WHERE tag_name IN (%s)" % placeholders, blacklist)
-            else:
-                placeholder_2 = ', '.join('?' for unused in whitelist)
+        s = self.DBsession()
 
-                blacklist.extend(whitelist)
+        subq = s.query(Post.id).distinct().join(Post.tags)
+        subq = subq.filter(Tag.name.in_(whitelist))
 
-                sql = "DELETE FROM post WHERE EXISTS (SELECT 1 FROM post_tag WHERE " \
-                "post.post_id = post_tag.post_id AND post.board_id = post_tag.board_id " \
-                "AND post_tag.tag_name IN (%s) AND post_tag.post_id NOT IN " \
-                "(SELECT post_id FROM post_tag WHERE tag_name IN (%s) GROUP BY post_id))"
+        q = s.query(Post.id).distinct().join(Post.tags)
+        q = q.filter(Tag.name.in_(blacklist)).except_(subq)
 
-                self.conn.execute(sql % (placeholders, placeholder_2), blacklist)
+        d = s.query(Post).filter(Post.id.in_(q))
+        count = d.delete(synchronize_session='fetch')
 
-                sql = "DELETE FROM post_tag WHERE tag_name IN (%s) AND tag_name NOT in (%s)"
-                self.conn.execute(sql % (placeholders, placeholder_2), blacklist)
-
-            self.conn.commit()
+        s.commit()
+        return count

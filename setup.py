@@ -28,7 +28,6 @@ setup(name='danbooru-daemon',
       platforms=['any'],
       packages=['danbooru'],
       scripts=['danbooru_daemon', 'danbooru_gui'],
-      package_data={'danbooru': ['data/*.sql']},
       data_files=[
                   ('share/danbooru-daemon/ui', ['ui/query-clear.png', 'ui/danbooru.ui']),
                   ('share/danbooru-daemon', ['sample-config.cfg', 'README'])

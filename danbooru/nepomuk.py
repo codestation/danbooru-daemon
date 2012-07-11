@@ -128,27 +128,27 @@ class NepomukJob(QtCore.QObject):
         #res.removeProperty(Soprano.Vocabulary.NAO.contributor())
         #res.removeProperty(Soprano.Vocabulary.NAO.personalIdentifier())
 
-        for name in post['tags']:
-            self._addTag(res, name)
-        url = KUrl(post['board_url'])
+        for tag in post.tags:
+            self._addTag(res, tag.name)
+        url = KUrl(post.board_url)
         url_res = Nepomuk.Resource(url)
         url_res.addType(Nepomuk.Vocabulary.NFO.Website())
         url_res.setLabel(url.prettyUrl())
         res.addIsRelated(url_res)
 
-        if post['source']:
-            res.setDescription("Source: %s" % KUrl(post['source']).prettyUrl())
+        if post.source:
+            res.setDescription("Source: %s" % KUrl(post.source).prettyUrl())
 
-        if post['score']:
-            res.addProperty(Soprano.Vocabulary.NAO.rating(), Nepomuk.Variant(post['score']))
+        if post.score:
+            res.addProperty(Soprano.Vocabulary.NAO.rating(), Nepomuk.Variant(post.score))
 
-        if post['author']:
-            res.addProperty(Soprano.Vocabulary.NAO.contributor(), Nepomuk.Variant(post['author']))
+        if post.author:
+            res.addProperty(Soprano.Vocabulary.NAO.contributor(), Nepomuk.Variant(post.author))
 
-        if post['rating']:
-            self._addTag(res, "rating-%s" % post['rating'])
+        if post.rating:
+            self._addTag(res, "rating-%s" % post.rating)
 
-        res.addProperty(Soprano.Vocabulary.NAO.personalIdentifier(), Nepomuk.Variant(str(post['id'])))
+        res.addProperty(Soprano.Vocabulary.NAO.personalIdentifier(), Nepomuk.Variant(str(post.id)))
 
     def setRating(self, file, rating):
         if rating not in range(0, 11):

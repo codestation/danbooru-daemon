@@ -15,15 +15,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import sys
-import signal
-import argparse
-import logging
-import shutil
 import re
-from time import sleep
+import sys
+import time
+import signal
+import shutil
+import logging
+import argparse
+
 from os import listdir, makedirs
 from os.path import join, isdir, isfile, splitext, expanduser
+
 from danbooru.error import DanbooruError
 from danbooru.api import Api
 from danbooru.database import Database
@@ -145,7 +147,7 @@ class Daemon(object):
             try:
                 posts = board.getPostsPage(tag, query, 1, 1)
                 if posts:
-                    return posts[0]['id'] + 1
+                    return posts[0]['post_id'] + 1
                 else:
                     logging.error('Error: cannot get last post id')
             except DanbooruError as e:
@@ -181,7 +183,7 @@ class Daemon(object):
             self.run_daemon(args, db)
         elif args.action == "update":
             board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
-            for tag in self.query:
+            for tag in self.query['tags']:
                 logging.debug("processing tag [%s]" % tag)
                 self.run_update(args, tag, cfg, board, db)
         elif args.action == "download":
@@ -229,7 +231,7 @@ class Daemon(object):
                 #self.run_nepomuk(cfg, db)
                 #if self._abort: break
             logging.debug("Waiting for %i seconds" % sleep_time)
-            sleep(sleep_time)
+            time.sleep(sleep_time)
 
     def run_update(self, args, tag, cfg, board, db):
         if not args.tags:
@@ -259,19 +261,19 @@ class Daemon(object):
                     logging.error('>>> %s' % e.message)
                 retries += 1
                 logging.warning('Retrying (%i) in 2 seconds...' % retries)
-                sleep(2)
+                time.sleep(2)
 
             if post_list:
-                result = db.addPosts(post_list)
-                if len(result) > 1:
-                    logging.debug('%i posts inserted, %i posts updated' % result)
-                else:
-                    logging.debug('%i posts inserted, no updates' % result)
-                if result[0] == 0:
+                start = time.time()
+                results = db.savePosts(post_list)
+                end = time.time() - start
+                logging.debug("New entries: %i posts, %i images, %i tags", results['posts'], results['images'], results['tags'])
+                logging.debug("Time taken: %.2f seconds" % end)
+                if not results['posts']:
                     logging.debug('Stopping since no new posts were inserted')
                     break
                 if cfg.fetch_mode == "id":
-                    last_id = post_list[-1]['id']
+                    last_id = post_list[-1]['post_id']
                     logging.debug('Fetching posts below id: %i' % last_id)
                 elif cfg.fetch_mode == "page":
                     page += 1
@@ -304,33 +306,40 @@ class Daemon(object):
         nk.updateDirectoryTags(cfg.download_path, db)
         self.unregisterClassSignal(nk)
 
-    def run_tags(self, args, cfg, db, board):
+    def run_tags(self, args, cfg, db, board):  # @UnusedVariable
         last_id = self.getLastId(args.tags, board, args.before_id)
         while not self._stop:
             tag_list = board.getTagsBefore(last_id, args.tags, cfg.limit)
             if tag_list:
-                db.addTags(tag_list)
+                #FIXME: implement addTags
+                #db.addTags(tag_list)
                 last_id = tag_list[-1]['id']
                 logging.debug('Next fetch id: %i' % last_id)
             else:
                 break
 
     def clean_loop(self, directory, dest, db):
+        count = 0
         for name in listdir(directory):
             if self._stop:
                 break
             full_path = join(directory, name)
             if isdir(full_path):
-                self.clean_loop(full_path, dest, db)
+                count += self.clean_loop(full_path, dest, db)
             elif isfile(full_path):
                 md5 = splitext(name)[0]
                 if not db.fileExists(md5):
                     logging.debug('%s isn\'t in database' % name)
                     shutil.move(full_path, join(dest, name))
+                    count += 1
+        return count
 
     def cleanup(self, cfg, db, args, dest):
-        db.deletePostsByTags(args.blacklist, args.whitelist)
-        self.clean_loop(cfg.download_path, dest, db)
+        count = db.deletePostsByTags(args.blacklist, args.whitelist)
+        logging.debug('Deleted %i posts' % count)
+
+        count = self.clean_loop(cfg.download_path, dest, db)
+        logging.debug('Moved %i images' % count)
 
 if __name__ == '__main__':
     Daemon().main()

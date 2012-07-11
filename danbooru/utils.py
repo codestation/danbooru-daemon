@@ -16,28 +16,12 @@
 #   limitations under the License.
 
 import re
-from urllib.parse import urlsplit
-from os.path import basename, splitext, exists, join, dirname, abspath
+from os.path import exists, join, dirname, abspath
 
 
 def list_generator(list_widget):
     for i in range(list_widget.count()):
         yield list_widget.item(i)
-
-
-def post_abspath(basedir, post):
-    base = post_basename(post)
-    subdir = post['md5'][0]
-    return join(basedir, subdir, base)
-
-
-def post_basename(post):
-    base = basename(urlsplit(post['file_url'])[2])
-    #fix extension to jpg
-    if splitext(base)[1] == ".jpeg":
-        return post['md5'] + ".jpg"
-    else:
-        return post['md5'] + splitext(base)[1]
 
 
 def parseDimension(term, dim):

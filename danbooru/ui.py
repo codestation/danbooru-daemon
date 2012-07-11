@@ -15,12 +15,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import time
 from os import makedirs
 from PyQt4 import QtCore, QtGui
 from os.path import basename, splitext, exists, join, expanduser
 
-from danbooru import utils
-from danbooru.database import Database
+from danbooru.models import Post
 
 
 class ThumbnailCache(object):
@@ -64,21 +64,22 @@ class ThumbnailCache(object):
 
 class ThumbnailWorker(QtCore.QThread):
 
-    makeIconSignal = QtCore.pyqtSignal(dict, QtGui.QImage)
+    makeIconSignal = QtCore.pyqtSignal(Post, QtGui.QImage)
     setStatusSignal = QtCore.pyqtSignal()
+    clearWidgetListSignal = QtCore.pyqtSignal()
     abort = False
 
-    def __init__(self, ListWidget, basedir, dbname, parent=None):
+    def __init__(self, ListWidget, basedir, parent=None):
         QtCore.QThread.__init__(self, parent)
         self.widget = ListWidget
-        self.dbname = dbname
         self.basedir = basedir
         user_path = expanduser("~")
         self.thumbnail_dir = join(user_path, ".cache/danbooru-daemon/thumbnails")
         makedirs(self.thumbnail_dir, exist_ok=True)
 
-    def setQuery(self, query):
+    def setData(self, query, db):
         self.query = query
+        self.db = db
 
     def stop(self):
         self.abort = True
@@ -87,26 +88,26 @@ class ThumbnailWorker(QtCore.QThread):
         self.abort = False
         th = ThumbnailCache(self.thumbnail_dir)
 
-        db = Database(self.dbname)
+        self.clearWidgetListSignal.emit()
+
         if self.query.get('site'):
-            db.setHost(host=None, alias=self.query['site'])
+            self.db.setHost(host=None, alias=self.query['site'])
         else:
-            db.clearHost()
-
+            self.db.clearHost()
         if self.query.get('tags'):
-            posts = db.getANDPosts(self.query['tags'], limit=200, extra_items=self.query)
+            posts = self.db.getANDPosts(self.query['tags'], limit=200, extra_items=self.query)
         else:
-            posts = db.getPosts(200, extra_items=self.query)
-
-        self.widget.clear()
+            posts = self.db.getPosts(200, extra_items=self.query)
 
         if not posts:
             self.setStatusSignal.emit()
         else:
             for post in posts:
                 if self.abort:
+                    time.sleep(1)
                     break
-                full_path = utils.post_abspath(self.basedir, post)
+                img = post.image
+                full_path = join(self.basedir, img.md5[0], img.md5 + img.file_ext)
                 image = th.getThumbnail(full_path)
                 self.makeIconSignal.emit(post, image)
 
