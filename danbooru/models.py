@@ -24,9 +24,8 @@ Base = declarative_base()
 
 
 class Model(object):
-    @classmethod
     @declared_attr
-    def __tablename__(cls):
+    def __tablename__(cls):  # @NoSelf
         return cls.__name__.lower()
 
     id = Column(Integer, primary_key=True)  # @ReservedAssignment
