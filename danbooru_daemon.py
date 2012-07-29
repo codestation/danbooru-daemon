@@ -262,6 +262,8 @@ class Daemon(object):
                 retries += 1
                 logging.warning('Retrying (%i) in 2 seconds...' % retries)
                 time.sleep(2)
+            else:
+                post_list = None
 
             if post_list:
                 start = time.time()
