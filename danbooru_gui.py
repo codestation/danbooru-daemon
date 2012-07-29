@@ -95,7 +95,8 @@ class DanbooruGUI(QtGui.QMainWindow):
         layout.addWidget(self.clearButton)
 
     def loadSettings(self):
-        self.info_values = (self.tr("Width"), self.tr("Height"), self.tr("Tags"), self.tr("Rating"),
+        self.info_values = (self.tr("Width"), self.tr("Height"),
+                            self.tr("Tags"), self.tr("Rating"),
                             self.tr("Score"), self.tr("From"), self.tr("ID"))
 
         # load user settings
@@ -149,7 +150,8 @@ class DanbooruGUI(QtGui.QMainWindow):
             full_path = join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
             self.img = QtGui.QImage(full_path)
             self.updatePreview()
-            tags = ['<a href="%s">%s</a>' % (tag.name, tag.name) for tag in post.tags]
+            tags = ['<a href="%s">%s</a>' % (tag.name, tag.name)
+                    for tag in post.tags]
             tags = " ".join(tags)
             str_format = self.info_format % self.info_values
             self.infoLabel.setText(str_format %
@@ -176,7 +178,8 @@ class DanbooruGUI(QtGui.QMainWindow):
         pixmap.convertFromImage(image)
         icon = QtGui.QIcon(pixmap)
         item.setIcon(icon)
-        self.statusLabel.setText(self.tr("Found %i images") % self.listWidget.count())
+        self.statusLabel.setText(self.tr("Found %i images") %
+                                 self.listWidget.count())
 
     def setStatus(self):
         self.statusLabel.setText(self.tr("No results"))
@@ -191,7 +194,8 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     def addItem(self, post):
         item = QtGui.QListWidgetItem()
-        item.setText(join(post.image.md5[0], post.image.md5 + post.image.file_ext))
+        filename = post.image.md5 + post.image.file_ext
+        item.setText(join(post.image.md5[0], filename))
         item.setIcon(QtGui.QIcon().fromTheme("image-x-generic"))
         item.setData(QtCore.Qt.UserRole, post)
         item.setTextAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignBottom)
@@ -206,7 +210,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         if not text:
             return
 
-        query = utils.parseQuery(text)
+        query = utils.parse_query(text)
         if isinstance(query, str):
             self.statusLabel.setText(self.tr("Error in term: %s") % query)
             return

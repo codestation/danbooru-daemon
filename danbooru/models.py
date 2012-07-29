@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 #   Copyright 2012 codestation
@@ -25,8 +24,9 @@ Base = declarative_base()
 
 
 class Model(object):
+    @classmethod
     @declared_attr
-    def __tablename__(cls):  # @NoSelf
+    def __tablename__(cls):
         return cls.__name__.lower()
 
     id = Column(Integer, primary_key=True)  # @ReservedAssignment
@@ -47,8 +47,10 @@ class Image(Model, Base):
 
 
 association_table = Table('tag_post', Base.metadata,
-    Column('tag_id', Integer, ForeignKey('tag.id', ondelete="CASCADE"), primary_key=True),
-    Column('post_id', Integer, ForeignKey('post.id', ondelete="CASCADE"), primary_key=True)
+    Column('tag_id', Integer, ForeignKey('tag.id', ondelete="CASCADE"),
+           primary_key=True),
+    Column('post_id', Integer, ForeignKey('post.id', ondelete="CASCADE"),
+           primary_key=True)
 )
 
 

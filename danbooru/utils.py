@@ -24,7 +24,7 @@ def list_generator(list_widget):
         yield list_widget.item(i)
 
 
-def parseDimension(term, dim):
+def parse_dimension(term, dim):
     query = {}
     if term[len("%s:" % dim)] == ">":
         query['%s_type' % dim] = ">"
@@ -38,7 +38,7 @@ def parseDimension(term, dim):
     return query
 
 
-def parseQuery(text):
+def parse_query(text):
     query = {}
     query['tags'] = []
 
@@ -54,9 +54,9 @@ def parseQuery(text):
             elif item.startswith("rating:"):
                 query['rating'] = item.split(":")[1]
             elif item.startswith("width:"):
-                query.update(parseDimension(item, "width"))
+                query.update(parse_dimension(item, "width"))
             elif item.startswith("height:"):
-                query.update(parseDimension(item, "height"))
+                query.update(parse_dimension(item, "height"))
             elif item.startswith("ratio:"):
                 query['ratio'] = item.split(":", 1)[1]
                 query['ratio_width'] = int(item.split(":")[1])
@@ -66,7 +66,7 @@ def parseQuery(text):
             else:
                 query['tags'].append(item)
         return query
-    except Exception:
+    except (ValueError, TypeError, IndexError):
         return item
 
 
@@ -87,30 +87,38 @@ def find_resource(base, filename):
 def filter_posts(posts, query):
 
     if query.get('rating'):
-        posts[:] = [post for post in posts if post['rating'] == query['rating']]
+        posts[:] = [post for post in posts
+                    if post['rating'] == query['rating']]
 
     if query.get('width'):
         if query['width_type'] == "=":
-            posts[:] = [post for post in posts if post['width'] == query['width']]
+            posts[:] = [post for post in posts
+                        if post['width'] == query['width']]
         if query['width_type'] == "<":
-            posts[:] = [post for post in posts if post['width'] < query['width']]
+            posts[:] = [post for post in posts
+                        if post['width'] < query['width']]
         if query['width_type'] == ">":
-            posts[:] = [post for post in posts if post['width'] > query['width']]
+            posts[:] = [post for post in posts
+                        if post['width'] > query['width']]
 
     if query.get('height'):
         if query['height_type'] == "=":
-            posts[:] = [post for post in posts if post['height'] == query['height']]
+            posts[:] = [post for post in posts
+                        if post['height'] == query['height']]
         if query['height_type'] == "<":
-            posts[:] = [post for post in posts if post['height'] < query['height']]
+            posts[:] = [post for post in posts
+                        if post['height'] < query['height']]
         if query['height_type'] == ">":
-            posts[:] = [post for post in posts if post['height'] > query['height']]
+            posts[:] = [post for post in posts
+                        if post['height'] > query['height']]
 
     if query.get('ratio'):
-        posts[:] = [post for post in posts if post['width'] * 1.0 / post['height'] ==
+        posts[:] = [post for post in posts
+                    if post['width'] * 1.0 / post['height'] ==
                     query['ratio_width'] * 1.0 / query['ratio_height']]
     return posts
 
 
-def remove_duplicates(self, posts):
+def remove_duplicates(posts):
     posts[:] = list(dict((x['id'], x) for x in posts).values())
     return sorted(posts, key=lambda k: k['id'], reverse=True)

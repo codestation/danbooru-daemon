@@ -55,9 +55,9 @@ class Settings(object):
                         setattr(self, key, optional[key])
 
         except configparser.NoSectionError:
-            logging.error('The section "%s" does not exist' % section)
+            logging.error('The section "%s" does not exist', section)
         except configparser.NoOptionError:
-            logging.error('The value for "%s" is missing' % key)
+            logging.error('The value for "%s" is missing', key)
         else:
             return True
         return False

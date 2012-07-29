@@ -165,7 +165,7 @@ class Database(object):
             q = q.limit(limit)
         return q.all()
 
-    def getPosts(self, limit=100, offset=0, extra_items=None):
+    def get_posts(self, limit=100, offset=0, extra_items=None):
         q = self.DBsession().query(Post)
         if extra_items:
             q = self._dict2query(q, extra_items)
