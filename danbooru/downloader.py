@@ -18,7 +18,7 @@ import sys
 import hashlib
 import logging
 from time import sleep
-from os.path import isfile, join
+from os.path import isfile, join, getsize
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
@@ -57,22 +57,26 @@ class Downloader(object):
 
             subdir = dl.image.md5[0]
             filename = join(self.path, subdir, base)
-            if nohash and isfile(filename):
-                #logging.debug("(%i) %s already exists, skipping" % (self._total, filename))
-                #self._total += 1
-                continue
-            md5 = self._calculateMD5(filename)
-            if md5:
-                if md5 == dl.image.md5:
-                    #logging.debug("%s already exists, skipping" % filename)
-                    continue
+            if isfile(filename):
+                if getsize(filename) == dl.image.file_size:
+                    if nohash:
+                        continue
+                    else:
+                        md5 = self._calculateMD5(filename)
+                        if md5:
+                            if md5 == dl.image.md5:
+                                #logging.debug("%s already exists, skipping" % filename)
+                                continue
+                            else:
+                                logging.warning("%s md5sum doesn't match, re-downloading", filename)
                 else:
-                    logging.warning("%s md5sum doesn't match, re-downloading" % filename)
-
+                    logging.warning("%s filesize doesn't match, re-downloading", filename)
+            else:
+                logging.warning("%s doesn't exists, re-downloading", filename)
             try:
                 local_file = open(filename, 'wb')
             except IOError:
-                logging.error('Error while creating %s' % filename)
+                logging.error('Error while creating %s', filename)
                 continue
 
             retries = 0
@@ -108,20 +112,20 @@ class Downloader(object):
                         sys.stdout.flush()
 
                     if self._stop:
-                        logging.debug('(%i) %s [ABORTED]' % (self._total, base))
+                        logging.debug('(%i) %s [ABORTED]', self._total, base)
                         break
 
-                    logging.debug('(%i) %s [OK]' % (self._total, base))
+                    logging.debug('(%i) %s [OK]', self._total, base)
                     self._total += 1
                     sleep(1)
                     break
                 except URLError as e:
-                    logging.error('>>> Error %s' % e.reason)
+                    logging.error('>>> Error %s', e.reason)
                 except HTTPError as e:
-                    logging.error('>>> Error %i: %s' % (e.code, e.msg))
+                    logging.error('>>> Error %i: %s', e.code, e.msg)
 
                 start = local_file.tell()
 
                 retries += 1
-                logging.warning('Retrying (%i) in 2 seconds...' % retries)
+                logging.warning('Retrying (%i) in 2 seconds...', retries)
                 sleep(2)
