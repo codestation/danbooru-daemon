@@ -48,11 +48,11 @@ class Database(object):
             )
         )
 
-    def _clean_post(self, model, post):
+    def _cleanPost(self, model, post):
         clean = [x.name for x in model.__mapper__.columns]
         return {key: value for key, value in post.items() if key in clean}
 
-    def _get_or_create(self, session, model, defaults=None, **kwargs):
+    def _getOrCreate(self, session, model, defaults=None, **kwargs):
         instance = session.query(model).filter_by(**kwargs).first()
         if instance:
             return instance, False
@@ -64,7 +64,7 @@ class Database(object):
             session.add(instance)
             return instance, True
 
-    def _dict2query(self, query, items):
+    def _dict2ToQuery(self, query, items):
         q = query.join(Post.image)
         if items.get("width"):
             if items['width_type'] == "<":
@@ -96,7 +96,7 @@ class Database(object):
 
     def setHost(self, host, alias):
         s = self.DBsession()
-        board, created = self._get_or_create(s, Board, **{'host': host, 'alias': alias})
+        board, created = self._getOrCreate(s, Board, **{'host': host, 'alias': alias})
         if created:
             s.add(board)
             s.commit()
@@ -112,23 +112,23 @@ class Database(object):
             if defaults['file_ext'] == ".jpeg":
                 defaults['file_ext'] = ".jpg"
 
-            clean_image = self._clean_post(Image, post)
+            clean_image = self._cleanPost(Image, post)
             defaults.update(clean_image)
 
-            img, created = self._get_or_create(s, Image, defaults, **{'md5': post['md5']})
+            img, created = self._getOrCreate(s, Image, defaults, **{'md5': post['md5']})
             results['images'] += int(created)
 
-            tags = [self._get_or_create(s, Tag, **{'name': v}) for v in post['tags']]
+            tags = [self._getOrCreate(s, Tag, **{'name': v}) for v in post['tags']]
             results['tags'] += sum(created for tag, created in tags)
 
             defaults = {'image': img, 'tags': [tag for tag, created in tags]}
-            clean_post = self._clean_post(Post, post)
+            clean_post = self._cleanPost(Post, post)
             defaults.update(clean_post)
 
             # avoid search by post_id
             del defaults['post_id']
 
-            new_post, created = self._get_or_create(s, Post, defaults, **{'post_id': post['post_id'], 'board': self.board})
+            new_post, created = self._getOrCreate(s, Post, defaults, **{'post_id': post['post_id'], 'board': self.board})
             results['posts'] += int(created)
 
             s.add(new_post)
@@ -155,7 +155,7 @@ class Database(object):
     def getANDPosts(self, tags, limit=100, extra_items=None):
         q = self.DBsession().query(Post).join(Post.tags)
         if extra_items:
-            q = self._dict2query(q, extra_items)
+            q = self._dict2ToQuery(q, extra_items)
         if self.board:
             q = q.filter(Post.board == self.board)
         q = q.filter(Tag.name.in_(tags)).group_by(Post.image_id)
@@ -164,10 +164,10 @@ class Database(object):
             q = q.limit(limit)
         return q.all()
 
-    def get_posts(self, limit=100, offset=0, extra_items=None):
+    def getPosts(self, limit=100, offset=0, extra_items=None):
         q = self.DBsession().query(Post)
         if extra_items:
-            q = self._dict2query(q, extra_items)
+            q = self._dict2ToQuery(q, extra_items)
         return q.limit(limit).offset(offset)
 
     def getFiles(self, limit, offset):

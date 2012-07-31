@@ -96,7 +96,7 @@ class ThumbnailWorker(QtCore.QThread):
         if self.query.get('tags'):
             posts = self.db.getANDPosts(self.query['tags'], limit=200, extra_items=self.query)
         else:
-            posts = self.db.get_posts(200, extra_items=self.query)
+            posts = self.db.getPosts(200, extra_items=self.query)
 
         if not posts:
             self.setStatusSignal.emit()

@@ -145,7 +145,7 @@ class Daemon(object):
             return int(before_id)
         else:
             try:
-                posts = board.get_posts_page(tag, query, 1, 1)
+                posts = board.getPostsPage(tag, query, 1, 1)
                 if posts:
                     return posts[0]['post_id'] + 1
                 else:
@@ -253,9 +253,9 @@ class Daemon(object):
             while retries < 3:
                 try:
                     if cfg.fetch_mode == "id":
-                        post_list = board.get_posts_before(last_id, tag, self.query, cfg.limit, args.blacklist, args.whitelist)
+                        post_list = board.getPostsBefore(last_id, tag, self.query, cfg.limit, args.blacklist, args.whitelist)
                     elif cfg.fetch_mode == "page":
-                        post_list = board.get_posts_page(tag, self.query, page, cfg.limit, args.blacklist, args.whitelist)
+                        post_list = board.getPostsPage(tag, self.query, page, cfg.limit, args.blacklist, args.whitelist)
                     break
                 except DanbooruError as e:
                     logging.error('>>> %s' % e.message)
@@ -311,11 +311,11 @@ class Daemon(object):
     def run_tags(self, args, cfg, db, board):  # @UnusedVariable
         last_id = self.getLastId(args.tags, board, args.before_id)
         while not self._stop:
-            tag_list = board.get_tags_before(last_id, args.tags, cfg.limit)
-            if tag_list:
+            tagList = board.getTagsBefore(last_id, args.tags, cfg.limit)
+            if tagList:
                 #FIXME: implement addTags
-                #db.addTags(tag_list)
-                last_id = tag_list[-1]['id']
+                #db.addTags(tagList)
+                last_id = tagList[-1]['id']
                 logging.debug('Next fetch id: %i' % last_id)
             else:
                 break

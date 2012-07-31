@@ -48,7 +48,7 @@ class Api(object):
         if self._delta_time < self.WAIT_TIME:
             sleep(self.WAIT_TIME - self._delta_time)
 
-    def _login_data(self):
+    def _loginData(self):
         if not self._login_string:
             sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
             sha1_password = sha1data.hexdigest()
@@ -56,20 +56,20 @@ class Api(object):
             self._login_string = '&login=%s&password_hash=%s' % (self.username, sha1_password)
         return self._login_string
 
-    def get_posts_page(self, tag, query, page, limit, blacklist=None, whitelist=None):
+    def getPostsPage(self, tag, query, page, limit, blacklist=None, whitelist=None):
         url = "%s%s?tags=%s&page=%i&limit=%i" % (self.host, self.POST_API,
-            tag, page, limit) + self._login_data()
-        return self.get_posts(url, query, blacklist, whitelist)
+            tag, page, limit) + self._loginData()
+        return self.getPosts(url, query, blacklist, whitelist)
 
-    def get_posts_before(self, post_id, tag, query, limit, blacklist=None, whitelist=None):
+    def getPostsBefore(self, post_id, tag, query, limit, blacklist=None, whitelist=None):
         url = "%s%s?before_id=%i&tags=%s&limit=%i" % (self.host, self.POST_API,
-              post_id, tag, limit) + self._login_data()
-        return self.get_posts(url, query, blacklist, whitelist)
+              post_id, tag, limit) + self._loginData()
+        return self.getPosts(url, query, blacklist, whitelist)
 
-    def get_tags_before(self, post_id, tags, limit):
+    def getTagsBefore(self, post_id, tags, limit):
         pass
 
-    def get_posts(self, url, query, blacklist, whitelist):
+    def getPosts(self, url, query, blacklist, whitelist):
         self._wait()
 
         try:
@@ -115,9 +115,9 @@ class Api(object):
         else:
             return posts
 
-    def tag_list(self, name):
+    def tagList(self, name):
         self._wait()
-        url = self.host + self.TAG_API + '?name=%s' % name + self._login_data()
+        url = self.host + self.TAG_API + '?name=%s' % name + self._loginData()
         try:
             response = urlopen(url)
             results = response.read().decode('utf8')
