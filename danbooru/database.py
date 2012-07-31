@@ -20,7 +20,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm.session import sessionmaker
-from sqlalchemy.sql.expression import func, ClauseElement, distinct
+from sqlalchemy.sql.expression import func, ClauseElement, distinct, not_
 
 from danbooru.models import Board, Post, Image, Tag, Base
 
@@ -157,7 +157,7 @@ class Database(object):
         if extra_items:
             q = self._dict2query(q, extra_items)
         if self.board:
-            q = q.filter_by(board=self.board)
+            q = q.filter(Post.board == self.board)
         q = q.filter(Tag.name.in_(tags)).group_by(Post.image_id)
         q = q.having(func.count(distinct(Tag.name)) == len(tags))
         if limit:
@@ -189,7 +189,11 @@ class Database(object):
         q = q.filter(Tag.name.in_(blacklist)).except_(subq)
 
         d = s.query(Post).filter(Post.id.in_(q))
-        count = d.delete(synchronize_session='fetch')
+        post_count = d.delete(synchronize_session='fetch')
+
+        q = s.query(Post.image_id).distinct()
+        d = s.query(Post.id).filter(not_(Post.image_id.in_(q)))
+        img_count = d.delete(synchronize_session='fetch')
 
         s.commit()
-        return count
+        return (post_count, img_count)
