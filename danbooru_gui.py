@@ -32,23 +32,25 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     BASE_DIR = "."
 
-    info_format = ('<table>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td><a href="width:%%i">%%i</a></td></tr>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td><a href="height:%%i">%%i</a></td></tr>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td>%%s</td></tr>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td><a href="rating:%%s">%%s</a></td></tr>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td>%%i</td></tr>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td>%%s</td></tr>' +
-                   '<tr><td align="right"><b>%s:</b></td>' +
-                   '<td>%%i</td></tr>' +
+    INFO_FORMAT = ('<table>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td><a href="width:%%i">%%i</a></td></tr>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td><a href="height:%%i">%%i</a></td></tr>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td>%%s</td></tr>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td><a href="rating:%%s">%%s</a></td></tr>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td>%%i</td></tr>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td>%%s</td></tr>'
+                   '<tr><td align="right"><b>%s:</b></td>'
+                   '<td>%%i</td></tr>'
                    '</table>'
                    )
+
+    RATING = {'s': "Safe", 'q': "Questionable", 'e': "Explicit"}
 
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
@@ -153,11 +155,11 @@ class DanbooruGUI(QtGui.QMainWindow):
             tags = ['<a href="%s">%s</a>' % (tag.name, tag.name)
                     for tag in post.tags]
             tags = " ".join(tags)
-            str_format = self.info_format % self.info_values
+            str_format = self.INFO_FORMAT % self.info_values
             self.infoLabel.setText(str_format %
                 (img.width, img.width, img.height, img.height,
-                 tags, post.rating, post.rating, post.score,
-                 post.board.host, post.post_id))
+                 tags, post.rating, self.RATING[post.rating],
+                 post.score, post.board.host, post.post_id))
         else:
             self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None
@@ -194,8 +196,7 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     def addItem(self, post):
         item = QtGui.QListWidgetItem()
-        filename = post.image.md5 + post.image.file_ext
-        item.setText(join(post.image.md5[0], filename))
+        item.setText(post.image.md5 + post.image.file_ext)
         item.setIcon(QtGui.QIcon().fromTheme("image-x-generic"))
         item.setData(QtCore.Qt.UserRole, post)
         item.setTextAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignBottom)
