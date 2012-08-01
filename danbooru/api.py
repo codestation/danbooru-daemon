@@ -16,6 +16,7 @@
 
 import re
 import json
+import socket
 import hashlib
 import logging
 
@@ -26,7 +27,6 @@ from time import sleep, time, gmtime, strftime
 
 from danbooru.error import DanbooruError
 from danbooru.utils import filter_posts
-from socket import socket
 
 
 class Api(object):

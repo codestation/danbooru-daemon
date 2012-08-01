@@ -15,6 +15,7 @@
 #   limitations under the License.
 
 import sys
+import socket
 import hashlib
 import logging
 from time import sleep
@@ -22,7 +23,6 @@ from os.path import isfile, join, getsize
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 from http.client import HTTPException
-from socket import socket
 
 
 class Downloader(object):
@@ -60,7 +60,7 @@ class Downloader(object):
             subdir = dl.image.md5[0]
             filename = join(self.path, subdir, base)
             if isfile(filename):
-                if getsize(filename) == dl.image.file_size:
+                if not dl.image.file_size or getsize(filename) == dl.image.file_size:
                     if nohash:
                         continue
                     else:
