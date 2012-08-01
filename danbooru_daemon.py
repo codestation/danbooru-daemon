@@ -290,7 +290,7 @@ class Daemon(object):
         offset = 0
 
         def callback(file, current, total):
-            sys.stdout.write("\r%s: %i of %i bytes", file, current, total)
+            sys.stdout.write("\r%s: %i of %i bytes" % (file, current, total))
             sys.stdout.flush()
 
         while not self._stop:
@@ -338,7 +338,7 @@ class Daemon(object):
 
     def cleanup(self, cfg, db, args, dest):
         post_c, img_c = db.deletePostsByTags(args.blacklist, args.whitelist)
-        logging.debug('Deleted %i posts, %i images refs', post_c, img_c)
+        logging.debug('Deleted %i posts, %i images refs', (post_c, img_c))
 
         count = self.clean_loop(cfg.download_path, dest, db)
         logging.debug('Moved %i images', count)
