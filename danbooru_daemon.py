@@ -114,13 +114,13 @@ class Daemon(object):
 
         query = parse_query(args.tags)
         if isinstance(query, str):
-            logging.error("Error in config file, malformed query: %s" % query)
+            logging.error("Error in config file, malformed query: %s", query)
             sys.exit(1)
 
         # cut down the tag list if it have too much items
         max_tags_number = cfg.max_tags
         if query['tags'] and len(query['tags']) > max_tags_number:
-            logging.warning('Using more than %i tags, cutting down list' % max_tags_number)
+            logging.warning('Using more than %i tags, cutting down list', max_tags_number)
             query['tags'] = query['tags'][:max_tags_number]
 
         return query
@@ -217,20 +217,20 @@ class Daemon(object):
                 cfg = self.readConfig(args.config, section, self.config_required, self.config_optional)
                 db.setHost(cfg.host, section)
                 board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
-                logging.debug("Run upload mode for %s" % section)
+                logging.debug(">>> Run upload mode for %s", section)
                 for tag in self.query['tags']:
-                    logging.debug("processing tag [%s]" % tag)
+                    logging.debug("processing tag [%s]", tag)
                     self.run_update(args, tag, cfg, board, db)
                     if self._stop:
                         return
-                logging.debug("Run download mode for %s" % section)
+                logging.debug(">>> Run download mode for %s", section)
                 self.run_download(cfg, db)
                 if self._stop:
                     return
                 #logging.debug("Run nepomuk mode for %s" % section)
                 #self.run_nepomuk(cfg, db)
                 #if self._abort: break
-            logging.debug("Waiting for %i seconds" % sleep_time)
+            logging.debug("Waiting for %i seconds", sleep_time)
             time.sleep(sleep_time)
 
     def run_update(self, args, tag, cfg, board, db):
@@ -240,10 +240,10 @@ class Daemon(object):
 
         if cfg.fetch_mode == "id":
             last_id = self.getLastId(tag, self.query, board, args.before_id)
-            logging.debug('Fetching posts below id: %i' % last_id)
+            logging.debug('Fetching posts below id: %i', last_id)
         elif cfg.fetch_mode == "page":
             page = 1
-            logging.debug('Fetching posts from page: %i' % page)
+            logging.debug('Fetching posts from page: %i', page)
         else:
             logging.error("Invalid fetch_mode")
             sys.exit(1)
@@ -260,7 +260,7 @@ class Daemon(object):
                 except DanbooruError as e:
                     logging.error('>>> %s' % e.message)
                 retries += 1
-                logging.warning('Retrying (%i) in 2 seconds...' % retries)
+                logging.warning('Retrying (%i) in 2 seconds...', retries)
                 time.sleep(2)
             else:
                 post_list = None
@@ -276,10 +276,10 @@ class Daemon(object):
                     break
                 if cfg.fetch_mode == "id":
                     last_id = post_list[-1]['post_id']
-                    logging.debug('Fetching posts below id: %i' % last_id)
+                    logging.debug('Fetching posts below id: %i', last_id)
                 elif cfg.fetch_mode == "page":
                     page += 1
-                    logging.debug('Fetching posts from page: %i' % page)
+                    logging.debug('Fetching posts from page: %i', page)
             else:
                 logging.debug('No posts returned')
                 break
@@ -290,7 +290,7 @@ class Daemon(object):
         offset = 0
 
         def callback(file, current, total):
-            sys.stdout.write("\r%s: %i of %i bytes" % (file, current, total))
+            sys.stdout.write("\r%s: %i of %i bytes", file, current, total)
             sys.stdout.flush()
 
         while not self._stop:
@@ -331,7 +331,7 @@ class Daemon(object):
             elif isfile(full_path):
                 md5 = splitext(name)[0]
                 if not db.fileExists(md5):
-                    logging.debug('%s isn\'t in database' % name)
+                    logging.debug('%s isn\'t in database', name)
                     shutil.move(full_path, join(dest, name))
                     count += 1
         return count
@@ -341,7 +341,7 @@ class Daemon(object):
         logging.debug('Deleted %i posts, %i images refs', post_c, img_c)
 
         count = self.clean_loop(cfg.download_path, dest, db)
-        logging.debug('Moved %i images' % count)
+        logging.debug('Moved %i images', count)
 
 if __name__ == '__main__':
     Daemon().main()

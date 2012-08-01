@@ -21,6 +21,7 @@ from time import sleep
 from os.path import isfile, join, getsize
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
+from http.client import HTTPException
 
 
 class Downloader(object):
@@ -71,8 +72,8 @@ class Downloader(object):
                                 logging.warning("%s md5sum doesn't match, re-downloading", filename)
                 else:
                     logging.warning("%s filesize doesn't match, re-downloading", filename)
-            else:
-                logging.warning("%s doesn't exists, re-downloading", filename)
+            #else:
+            #    logging.warning("%s doesn't exists, re-downloading", filename)
             try:
                 local_file = open(filename, 'wb')
             except IOError:
@@ -119,10 +120,12 @@ class Downloader(object):
                     self._total += 1
                     sleep(1)
                     break
-                except URLError as e:
-                    logging.error('>>> Error %s', e.reason)
                 except HTTPError as e:
                     logging.error('>>> Error %i: %s', e.code, e.msg)
+                except URLError as e:
+                    logging.error('>>> Error %s', e.reason)
+                except HTTPException as e:
+                    logging.error('>>> Error HTTPException')
 
                 start = local_file.tell()
 
