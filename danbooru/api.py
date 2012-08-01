@@ -26,6 +26,7 @@ from time import sleep, time, gmtime, strftime
 
 from danbooru.error import DanbooruError
 from danbooru.utils import filter_posts
+from socket import socket
 
 
 class Api(object):
@@ -80,6 +81,8 @@ class Api(object):
             raise DanbooruError("%s (%s)" % (ex.reason, self.host))
         except HTTPException as ex:
             raise DanbooruError("Error: HTTPException")
+        except socket.error as ex:
+            raise DanbooruError("Connection error: %s" % ex)
 
         results = response.read().decode('utf8')
         posts = json.loads(results)
@@ -129,3 +132,5 @@ class Api(object):
             raise DanbooruError("%s (%s)" % (ex.reason, self.host))
         except HTTPException as ex:
             raise DanbooruError("Error: HTTPException")
+        except socket.error as ex:
+            raise DanbooruError("Connection error: %s" % ex)

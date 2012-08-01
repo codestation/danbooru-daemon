@@ -22,6 +22,7 @@ from os.path import isfile, join, getsize
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 from http.client import HTTPException
+from socket import socket
 
 
 class Downloader(object):
@@ -126,6 +127,8 @@ class Downloader(object):
                     logging.error('>>> Error %s', e.reason)
                 except HTTPException as e:
                     logging.error('>>> Error HTTPException')
+                except socket.error as e:
+                    logging.error("Connection error: %s", e)
 
                 start = local_file.tell()
 
