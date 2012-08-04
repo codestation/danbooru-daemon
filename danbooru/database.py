@@ -150,6 +150,7 @@ class Database(object):
     def getORPosts(self, tags, limit):
         q = self.DBsession().query(Post).join(Post.tags)
         q = q.filter(Tag.name.in_(tags)).group_by(Post.image_id)
+        q = q.order_by(Post.post_id.desc())
         return q.limit(limit).all()
 
     def getANDPosts(self, tags, limit=100, extra_items=None):
@@ -160,6 +161,7 @@ class Database(object):
             q = q.filter(Post.board == self.board)
         q = q.filter(Tag.name.in_(tags)).group_by(Post.image_id)
         q = q.having(func.count(distinct(Tag.name)) == len(tags))
+        q = q.order_by(Post.post_id.desc())
         if limit:
             q = q.limit(limit)
         return q.all()
@@ -168,6 +170,7 @@ class Database(object):
         q = self.DBsession().query(Post)
         if extra_items:
             q = self._dict2ToQuery(q, extra_items)
+        q = q.order_by(Post.post_id.desc())
         return q.limit(limit).offset(offset)
 
     def getFiles(self, limit, offset):
