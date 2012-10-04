@@ -16,13 +16,15 @@
 
 import logging
 import configparser
+from danbooru.error import DanbooruError
 
 
 class Settings(object):
 
     def __init__(self, configfile):
         self.config = configparser.ConfigParser(interpolation=None)
-        self.config.read(configfile)
+        if not self.config.read(configfile):
+            raise DanbooruError('No config loaded')
 
     def set_value(self, key, section):
         if isinstance(key, tuple):

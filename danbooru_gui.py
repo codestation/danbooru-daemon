@@ -23,6 +23,7 @@ from PyQt4 import QtCore, QtGui, uic
 from danbooru import utils, ui
 from danbooru.settings import Settings
 from danbooru.database import Database
+from danbooru.error import DanbooruError
 
 
 class DanbooruGUI(QtGui.QMainWindow):
@@ -55,13 +56,10 @@ class DanbooruGUI(QtGui.QMainWindow):
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.ui = uic.loadUi(utils.find_resource(__name__, "ui/danbooru.ui"), self)
-        self.loadSettings()
         self.setupUI()
+        self.loadSettings()
 
     def setupUI(self):
-        # UI settings
-        self.listWidget.setDragEnabled(False)
-
         # UI signals
         self.searchButton.clicked.connect(self.startSearch)
         self.queryBox.returnPressed.connect(self.startSearch)
@@ -69,12 +67,14 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.listWidget.itemEntered.connect(self.itemOver)
         self.listWidget.itemSelectionChanged.connect(self.selectionChanged)
         self.infoLabel.linkActivated.connect(self.tagSelected)
+
         # UI event overrides
         self.infoDock.resizeEvent = self.updatePreview
 
-        # UI data
+        # UI settings
         pixels = self.zoomSlider.value() * self.SLIDER_MULT
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
+        self.listWidget.setDragEnabled(False)
 
         # Other setup
         self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
@@ -96,6 +96,10 @@ class DanbooruGUI(QtGui.QMainWindow):
         layout.addStretch()
         layout.addWidget(self.clearButton)
 
+        # add a keyboard shortcut to toggle visibility of the info panel
+        shortcut = QtGui.QShortcut(QtGui.QKeySequence("F11"), self)
+        shortcut.activated.connect(self.toggleInfoPanel)
+
     def loadSettings(self):
         self.info_values = (self.tr("Width"), self.tr("Height"),
                             self.tr("Tags"), self.tr("Rating"),
@@ -103,16 +107,24 @@ class DanbooruGUI(QtGui.QMainWindow):
 
         # load user settings
         user_dir = expanduser("~")
-        cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
-        cfg.load("default", ['download_path'], {'dbname': None})
+        try:
+            cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
+            cfg.load("default", ['download_path'], {'dbname': None})
 
-        # Get the base path for image search
-        self.BASE_DIR = cfg.download_path
+            # Get the base path for image search
+            self.BASE_DIR = cfg.download_path
 
-        if not cfg.dbname:
-            daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
-            cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
-        self.db = Database(join(daemon_dir, cfg.dbname))
+            if not cfg.dbname:
+                daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
+                cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
+            self.db = Database(join(daemon_dir, cfg.dbname))
+        except DanbooruError:
+            self.statusLabel.setText(self.tr("No config loaded"))
+            self.searchButton.setEnabled(False)
+            self.queryBox.returnPressed.disconnect(self.startSearch)
+
+    def toggleInfoPanel(self):
+        self.infoDock.setVisible(not self.infoDock.isVisible())
 
     def clearWidgetList(self):
         self.listWidget.clear()
