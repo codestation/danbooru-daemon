@@ -337,8 +337,8 @@ class Daemon(object):
         return count
 
     def cleanup(self, cfg, db, args, dest):
-        post_c, img_c = db.deletePostsByTags(args.blacklist, args.whitelist)
-        logging.debug('Deleted %i posts, %i images refs', post_c, img_c)
+        post_c, img_c, tag_c = db.deletePostsByTags(args.blacklist, args.whitelist)
+        logging.debug('Deleted %i posts, %i images refs, %i tags', post_c, img_c, tag_c)
 
         count = self.clean_loop(cfg.download_path, dest, db)
         logging.debug('Moved %i images', count)

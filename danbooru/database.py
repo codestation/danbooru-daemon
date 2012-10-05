@@ -107,6 +107,8 @@ class Database(object):
         s = self.DBsession()
 
         for post in posts:
+            if 'file_url' not in post:
+                continue
             #fix file extension
             defaults = {'file_ext': os.path.splitext(post['file_url'])[1]}
             if defaults['file_ext'] == ".jpeg":
@@ -199,5 +201,9 @@ class Database(object):
         d = s.query(Post.id).filter(not_(Post.image_id.in_(q)))
         img_count = d.delete(synchronize_session='fetch')
 
+        q = s.query(Tag.id).join(Post.tags)
+        d = s.query(Tag.id).filter(not_(Tag.id.in_(q)))
+        tag_count = d.delete(synchronize_session='fetch')
+
         s.commit()
-        return (post_count, img_count)
+        return (post_count, img_count, tag_count)
