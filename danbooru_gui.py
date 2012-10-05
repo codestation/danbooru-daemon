@@ -16,6 +16,7 @@
 #   limitations under the License.
 
 import sys
+import webbrowser
 from locale import getlocale
 from os.path import join, expanduser
 from PyQt4 import QtCore, QtGui, uic
@@ -48,6 +49,8 @@ class DanbooruGUI(QtGui.QMainWindow):
                    '<td>%%s</td></tr>'
                    '<tr><td align="right"><b>%s:</b></td>'
                    '<td>%%i</td></tr>'
+                   '<tr><td align="right"><b>URL:</b></td>'
+                   '<td><a href="%%s">%%s</a></td></tr>'
                    '</table>'
                    )
 
@@ -179,14 +182,19 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.infoLabel.setText(str_format %
                 (img.width, img.width, img.height, img.height,
                  tags, post.rating, self.RATING[post.rating],
-                 post.score, post.board.host, post.post_id))
+                 post.score, post.board.host, post.post_id,
+                 "%s/post/show/%i" % (post.board.host, post.post_id),
+                 "%s/post/show/%i" % (post.board.host, post.post_id)))
         else:
             self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None
 
     def tagSelected(self, tag):
-        self.queryBox.setText(self.queryBox.text() + " %s" % tag)
-        self.startSearch()
+        if tag.startswith("http://"):
+            webbrowser.open(tag)
+        else:
+            self.queryBox.setText(self.queryBox.text() + " %s" % tag)
+            self.startSearch()
 
     def makeIcon(self, post, image):
         item = self.addItem(post)
