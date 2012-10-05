@@ -58,6 +58,13 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.ui = uic.loadUi(utils.find_resource(__name__, "ui/danbooru.ui"), self)
         self.setupUI()
         self.loadSettings()
+        self.setupThumbnailWorker()
+
+    def setupThumbnailWorker(self):
+        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
+        self.thumb.makeIconSignal.connect(self.makeIcon)
+        self.thumb.setStatusSignal.connect(self.setStatus)
+        self.thumb.clearWidgetListSignal.connect(self.clearWidgetList)
 
     def setupUI(self):
         # UI signals
@@ -75,12 +82,6 @@ class DanbooruGUI(QtGui.QMainWindow):
         pixels = self.zoomSlider.value() * self.SLIDER_MULT
         self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
         self.listWidget.setDragEnabled(False)
-
-        # Other setup
-        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
-        self.thumb.makeIconSignal.connect(self.makeIcon)
-        self.thumb.setStatusSignal.connect(self.setStatus)
-        self.thumb.clearWidgetListSignal.connect(self.clearWidgetList)
 
         # Add clear button on queryBox
         self.clearButton = QtGui.QPushButton(self.queryBox)
@@ -147,7 +148,10 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.previewWidget.setMinimumHeight(height)
 
             size = self.previewWidget.size()
-            self.previewWidget.setPixmap(ui.getScaledPixmap(self.img, size))
+            if isinstance(self.img, QtGui.QIcon):
+                self.previewWidget.setPixmap(ui.getScaledPixmap(self.img.pixmap(256, 256), size))
+            else:
+                self.previewWidget.setPixmap(ui.getScaledPixmap(self.img, size))
 
     def selectionChanged(self):
         items = self.listWidget.selectedItems()
@@ -163,6 +167,10 @@ class DanbooruGUI(QtGui.QMainWindow):
             img = post.image
             full_path = join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
             self.img = QtGui.QImage(full_path)
+
+            if not self.img or self.img.byteCount() == 0:
+                self.img = QtGui.QIcon().fromTheme("image-x-generic")
+
             self.updatePreview()
             tags = ['<a href="%s">%s</a>' % (tag.name, tag.name)
                     for tag in post.tags]
@@ -180,18 +188,14 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.queryBox.setText(self.queryBox.text() + " %s" % tag)
         self.startSearch()
 
-    def itemClicked(self, item):
-        post = item.data(QtCore.Qt.UserRole)
-        full_path = join(self.BASE_DIR, post.md5[0], post.md5 + post.file_ext)
-        self.previewWidget.setPixmap(QtGui.QPixmap(full_path))
-
     def makeIcon(self, post, image):
         item = self.addItem(post)
         value = self.zoomSlider.value() * self.SLIDER_MULT
-        pixmap = QtGui.QPixmap(value, value)
-        pixmap.convertFromImage(image)
-        icon = QtGui.QIcon(pixmap)
-        item.setIcon(icon)
+        if image:
+            pixmap = QtGui.QPixmap(value, value)
+            pixmap.convertFromImage(image)
+            icon = QtGui.QIcon(pixmap)
+            item.setIcon(icon)
         self.statusLabel.setText(self.tr("Found %i images") %
                                  self.listWidget.count())
 

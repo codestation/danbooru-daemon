@@ -63,7 +63,7 @@ class ThumbnailCache(object):
 
 class ThumbnailWorker(QtCore.QThread):
 
-    makeIconSignal = QtCore.pyqtSignal(Post, QtGui.QImage)
+    makeIconSignal = QtCore.pyqtSignal(Post, object)
     setStatusSignal = QtCore.pyqtSignal()
     clearWidgetListSignal = QtCore.pyqtSignal()
     abort = False
@@ -121,4 +121,7 @@ def getScaledPixmap(image, size):
         img = image.scaledToHeight(width, QtCore.Qt.SmoothTransformation)
     else:
         img = image.scaledToWidth(width, QtCore.Qt.SmoothTransformation)
-    return QtGui.QPixmap.fromImage(img)
+    if isinstance(image, QtGui.QImage):
+        return QtGui.QPixmap.fromImage(img)
+    else:
+        return img
