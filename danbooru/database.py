@@ -198,7 +198,7 @@ class Database(object):
 
         # delete the image refs without posts from the database
         q = s.query(Post.image_id).distinct()
-        d = s.query(Post.id).filter(not_(Post.image_id.in_(q)))
+        d = s.query(Image.id).filter(not_(Image.id.in_(q)))
         img_count = d.delete(synchronize_session='fetch')
 
         q = s.query(Tag.id).join(Post.tags)
