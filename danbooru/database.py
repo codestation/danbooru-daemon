@@ -96,11 +96,17 @@ class Database(object):
 
     def setHost(self, host, alias):
         s = self.DBsession()
-        board, created = self._getOrCreate(s, Board, **{'host': host, 'alias': alias})
-        if created:
-            s.add(board)
-            s.commit()
+        if host:
+            board, created = self._getOrCreate(s, Board, **{'host': host, 'alias': alias})
+            if created:
+                s.add(board)
+                s.commit()
+        else:
+            board = s.query(Board).filter_by(alias=alias).first()
+            if not board:
+                return False
         self.board = board
+        return True
 
     def savePosts(self, posts):
         results = {'tags': 0, 'images': 0, 'posts': 0}
