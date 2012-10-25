@@ -288,17 +288,18 @@ class Daemon(object):
         dl = Downloader(cfg.download_path)
         self.registerClassSignal(dl)
         offset = 0
+        limit = 2048
 
         def callback(file, current, total):
             sys.stdout.write("\r%s: %i of %i bytes" % (file, current, total))
             sys.stdout.flush()
 
         while not self._stop:
-            rows = db.getFiles(100, offset)
+            rows = db.getFiles(limit, offset)
             if not rows:
                 break
             dl.downloadQueue(rows, cfg.skip_file_check, callback)
-            offset += 100
+            offset += limit
         self.unregisterClassSignal(dl)
 
     def run_nepomuk(self, cfg, db):

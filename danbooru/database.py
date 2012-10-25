@@ -17,7 +17,7 @@
 import os
 
 from sqlalchemy import event
-from sqlalchemy.orm import scoped_session
+from sqlalchemy.orm import scoped_session, joinedload
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.sql.expression import func, ClauseElement, distinct, not_
@@ -185,6 +185,7 @@ class Database(object):
         q = self.DBsession().query(Post).join(Post.image)
         if self.board:
             q = q.filter(Post.board == self.board)
+        q = q.options(joinedload('image'))
         return q.limit(limit).offset(offset).all()
 
     def deletePostsByTags(self, blacklist, whitelist):
