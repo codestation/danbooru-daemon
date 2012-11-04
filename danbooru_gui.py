@@ -163,6 +163,7 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.img = None
         elif len(items) == 1:
             item = items[0]
+            self.listWidget.scrollToItem(item)
             self.nameLabel.setText(self.tr("1 selected item"))
             post = item.data(QtCore.Qt.UserRole)
             sess = self.db.DBsession()
