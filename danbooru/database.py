@@ -70,17 +70,17 @@ class Database(object):
             if items['width_type'] == "<":
                 q = q.filter(Image.width < items['width'])
             elif items['width_type'] == ">":
-                q = query.filter(Image.width > items['width'])
+                q = q.filter(Image.width > items['width'])
             else:
-                q = query.filter(Image.width == items['width'])
+                q = q.filter(Image.width == items['width'])
 
         elif items.get("height"):
             if items['height_type'] == "<":
-                q = q.filter(Image.width < items['height'])
+                q = q.filter(Image.height < items['height'])
             elif items['height_type'] == ">":
-                q = query.filter(Image.width > items['height'])
+                q = q.filter(Image.height > items['height'])
             else:
-                q = query.filter(Image.width == items['height'])
+                q = q.filter(Image.height == items['height'])
 
         elif items.get("rating"):
             q = q.filter(Post.rating == items['rating'])
