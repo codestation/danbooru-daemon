@@ -43,4 +43,7 @@ First use:
     
   * "ratio:width:height": search for images with the specified aspect ratio.
    e.g.: ratio:16:9 (search for images with 16:9 aspect ratio).
+   
+Special features of the danbooru_gui:
+* Double click on a image to view it in full screen.
  

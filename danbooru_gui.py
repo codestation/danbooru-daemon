@@ -25,6 +25,7 @@ from danbooru import utils, ui
 from danbooru.settings import Settings
 from danbooru.database import Database
 from danbooru.error import DanbooruError
+from danbooru.ui import ImageViewer
 
 
 class DanbooruGUI(QtGui.QMainWindow):
@@ -76,6 +77,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.zoomSlider.sliderMoved.connect(self.sliderMove)
         self.listWidget.itemEntered.connect(self.itemOver)
         self.listWidget.itemSelectionChanged.connect(self.selectionChanged)
+        self.listWidget.itemDoubleClicked.connect(self.doubleClicked)
         self.infoLabel.linkActivated.connect(self.tagSelected)
 
         # UI event overrides
@@ -155,6 +157,19 @@ class DanbooruGUI(QtGui.QMainWindow):
                 self.previewWidget.setPixmap(ui.getScaledPixmap(self.img.pixmap(256, 256), size))
             else:
                 self.previewWidget.setPixmap(ui.getScaledPixmap(self.img, size))
+
+    def showImage(self, full_path):
+        self.viewer = ImageViewer()
+        self.viewer.loadImage(path=full_path)
+        self.viewer.showFullScreen()
+
+    def doubleClicked(self, item):
+        post = item.data(QtCore.Qt.UserRole)
+        sess = self.db.DBsession()
+        post = sess.merge(post)
+        img = post.image
+        full_path = join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
+        self.showImage(full_path)
 
     def selectionChanged(self):
         items = self.listWidget.selectedItems()

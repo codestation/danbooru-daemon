@@ -111,6 +111,115 @@ class ThumbnailWorker(QtCore.QThread):
                 self.makeIconSignal.emit(post, image)
 
 
+class ImageView(QtGui.QGraphicsView):
+
+    MARGIN = 5
+
+    def __init__(self, parent=None):
+        QtGui.QGraphicsView.__init__(self, parent)
+        self.mScrollPos = None
+
+    def scrollSet(self, pos):
+        self.horizontalScrollBar().setValue(pos.x())
+        self.verticalScrollBar().setValue(pos.y())
+
+    def scrollGet(self):
+        x = self.horizontalScrollBar().value()
+        y = self.verticalScrollBar().value()
+        return QtCore.QPoint(x, y)
+
+    def mouseMoveEvent(self, event):
+        QtGui.QGraphicsView.mouseMoveEvent(self, event)
+
+        mouseWarp = False
+        mousePos = event.pos()
+
+        maxWidth = self.rect().width()
+        maxHeight = self.rect().height()
+
+        if mousePos.x() <= self.MARGIN:
+            mousePos.setX(maxWidth - self.MARGIN - 1)
+            mouseWarp = True
+        elif mousePos.x() >= maxWidth - self.MARGIN:
+            mousePos.setX(self.MARGIN + 1)
+            mouseWarp = True
+        if mousePos.y() <= self.MARGIN:
+            mousePos.setY(maxHeight - self.MARGIN - 1)
+            mouseWarp = True
+        elif mousePos.y() >= maxHeight - self.MARGIN:
+            mousePos.setY(self.MARGIN + 1)
+            mouseWarp = True
+
+        screenDelta = QtGui.QCursor.pos() - event.pos()
+
+        if mouseWarp:
+            QtGui.QCursor.setPos(mousePos + screenDelta)
+            self.mScrollPos = self.scrollGet()
+        elif self.mScrollPos != None:
+            self.scrollSet(self.mScrollPos)
+            self.mScrollPos = None
+
+    def mouseDoubleClickEvent(self, event):  # @UnusedVariable
+        self.parentWidget().close()
+
+
+class ImageViewer(QtGui.QWidget):
+
+    SCALE_TO_WIDTH = True
+    SCALE_TO_HEIGHT = False
+    FIT_TO_SCREEN = False
+
+    def __init__(self, parent=None):
+        QtGui.QWidget.__init__(self, parent)
+        layout = QtGui.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.pixmap = None
+
+        scene = QtGui.QGraphicsScene()
+        self.item = QtGui.QGraphicsPixmapItem()
+        scene.addItem(self.item)
+
+        self.view = ImageView()
+        self.view.setFrameStyle(0)
+        self.view.setDragMode(QtGui.QGraphicsView.ScrollHandDrag)
+        self.view.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.black))
+        self.view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.view.setRenderHint(QtGui.QPainter.Antialiasing & QtGui.QPainter.SmoothPixmapTransform)
+        self.view.setScene(scene)
+
+        layout.addWidget(self.view)
+
+    def loadImage(self, image=None, path=None):
+        if image:
+            self.pixmap = QtGui.QPixmap.fromImage(image)
+        elif path:
+            self.pixmap = QtGui.QPixmap()
+            self.pixmap.load(path)
+        if self.pixmap:
+            self.item.setPixmap(self.pixmap)
+
+    def onResize(self, event):  # @UnusedVariable
+        wrect = self.rect()
+        prect = self.pixmap.rect()
+
+        ratioW = wrect.width() / prect.width()
+        ratioH = wrect.height() / prect.height()
+        if not self.SCALE_TO_HEIGHT:
+            if self.FIT_TO_SCREEN:
+                self.item.setPixmap(self.pixmap.scaledToWidth(prect.width() * ratioW, QtCore.Qt.SmoothTransformation))
+            self.view.verticalScrollBar().setValue(0)
+        elif not self.SCALE_TO_WIDTH:
+            if self.FIT_TO_SCREEN:
+                self.item.setPixmap(self.pixmap.scaledToHeight(prect.height() * ratioH, QtCore.Qt.SmoothTransformation))
+            self.view.horizontalScrollBar().setValue(0)
+        else:
+            ratio = min(ratioW, ratioH)
+            self.item.setPixmap(self.pixmap.scaled(int(prect.width() * ratio), int(prect.height() * ratio), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+        wrect = self.item.pixmap().rect()
+        self.view.setSceneRect(QtCore.QRectF(wrect))
+
+
 def getScaledPixmap(image, size):
     if size.width() > size.height():
         width = size.height()
