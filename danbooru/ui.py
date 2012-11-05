@@ -162,12 +162,23 @@ class ImageView(QtGui.QGraphicsView):
     def mouseDoubleClickEvent(self, event):  # @UnusedVariable
         self.parentWidget().close()
 
+    def keyPressEvent(self, event):
+        # let pass the keys to the parent
+        key = event.key()
+        if key == QtCore.Qt.Key_Left:
+            event.ignore()
+        elif key == QtCore.Qt.Key_Right:
+            event.ignore()
 
-class ImageViewer(QtGui.QWidget):
+
+class ImageViewer(QtGui.QDialog):
 
     SCALE_TO_WIDTH = True
-    SCALE_TO_HEIGHT = False
+    SCALE_TO_HEIGHT = True
     FIT_TO_SCREEN = False
+
+    onNextImage = QtCore.pyqtSignal(QtGui.QDialog)
+    onPrevImage = QtCore.pyqtSignal(QtGui.QDialog)
 
     def __init__(self, parent=None):
         QtGui.QWidget.__init__(self, parent)
@@ -198,6 +209,7 @@ class ImageViewer(QtGui.QWidget):
             self.pixmap.load(path)
         if self.pixmap:
             self.item.setPixmap(self.pixmap)
+            self.onResize(None)
 
     def onResize(self, event):  # @UnusedVariable
         wrect = self.rect()
@@ -218,6 +230,13 @@ class ImageViewer(QtGui.QWidget):
             self.item.setPixmap(self.pixmap.scaled(int(prect.width() * ratio), int(prect.height() * ratio), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
         wrect = self.item.pixmap().rect()
         self.view.setSceneRect(QtCore.QRectF(wrect))
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key == QtCore.Qt.Key_Left:
+            self.onPrevImage.emit(self)
+        elif key == QtCore.Qt.Key_Right:
+            self.onNextImage.emit(self)
 
 
 def getScaledPixmap(image, size):

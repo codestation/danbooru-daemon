@@ -158,18 +158,38 @@ class DanbooruGUI(QtGui.QMainWindow):
             else:
                 self.previewWidget.setPixmap(ui.getScaledPixmap(self.img, size))
 
-    def showImage(self, full_path):
-        self.viewer = ImageViewer()
-        self.viewer.loadImage(path=full_path)
-        self.viewer.showFullScreen()
-
-    def doubleClicked(self, item):
+    def getItemPath(self, item):
         post = item.data(QtCore.Qt.UserRole)
         sess = self.db.DBsession()
         post = sess.merge(post)
         img = post.image
-        full_path = join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
-        self.showImage(full_path)
+        return join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
+
+    def nextImage(self, viewer):
+        self.listWidget.setCurrentRow(self.listWidget.currentRow() + 1, QtGui.QItemSelectionModel.SelectCurrent)
+        item = self.listWidget.currentItem()
+        path = self.getItemPath(item)
+        viewer.loadImage(path=path)
+
+    def prevImage(self, viewer):
+        self.listWidget.setCurrentRow(self.listWidget.currentRow() - 1, QtGui.QItemSelectionModel.SelectCurrent)
+        item = self.listWidget.currentItem()
+        path = self.getItemPath(item)
+        viewer.loadImage(path=path)
+
+    def showImage(self, full_path):
+        viewer = ImageViewer()
+        viewer.loadImage(path=full_path)
+        viewer.onNextImage.connect(self.nextImage)
+        viewer.onPrevImage.connect(self.prevImage)
+        viewer.showFullScreen()
+        self.hide()
+        viewer.exec()
+        self.show()
+
+    def doubleClicked(self, item):
+        path = self.getItemPath(item)
+        self.showImage(path)
 
     def selectionChanged(self):
         items = self.listWidget.selectedItems()
