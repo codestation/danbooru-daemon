@@ -32,6 +32,7 @@ from danbooru.database import Database
 from danbooru.settings import Settings
 from danbooru.downloader import Downloader
 from danbooru.utils import parse_query
+from danbooru.gelbooru_api import GelbooruAPI
 
 
 class Daemon(object):
@@ -40,6 +41,7 @@ class Daemon(object):
     abort_list = {}
 
     config_required = [
+                       'api_mode',
                        'host',
                        'username',
                        'password',
@@ -182,7 +184,10 @@ class Daemon(object):
         if args.action == "daemon":
             self.run_daemon(args, db)
         elif args.action == "update":
-            board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            if cfg.api_mode == "danbooru":
+                board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            elif cfg.api_mode == "gelbooru":
+                board = GelbooruAPI(cfg.host)
             for tag in self.query['tags']:
                 logging.debug("processing tag [%s]" % tag)
                 self.run_update(args, tag, cfg, board, db)
@@ -193,6 +198,12 @@ class Daemon(object):
         elif args.action == "tags":
             board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_tags(args, db, board)
+        elif args.action == "pools":
+            board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            self.run_pools(db, board)
+        elif args.action == "pool_posts":
+            board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            self.run_pool_posts(db, board)
         elif args.action == "cleanup":
             self.cleanup(cfg, db, args, cfg.download_path)
 
@@ -320,6 +331,50 @@ class Daemon(object):
                 logging.debug('Next fetch id: %i' % last_id)
             else:
                 break
+
+    def run_pools(self, db, board):
+        page = 1
+        while not self._stop:
+            logging.debug('Fetching pools from page: %i', page)
+            poolList = board.getPoolsPage(page)
+            if poolList:
+                created, updated, up_to_date = db.savePools(poolList)
+                if up_to_date:
+                    logging.debug('Pool list up-to-date, %i new, %i updated', created, updated)
+                    break
+                page += 1
+            else:
+                break
+
+    def run_pool_posts(self, db, board):
+        offset = 0
+        limit = 1000
+        pools = list()
+        while not self._stop:
+            pools_data = db.getPools(limit, offset)
+            if not pools_data:
+                break
+            pools += [x.pool_id for x in pools_data]
+            offset += limit
+            logging.debug('Building pool list: %i...', offset)
+        logging.debug('Fetching posts from %i pools', len(pools))
+        for pool in pools:
+            page = 1
+            count = 0
+            total = 0
+            while not self._stop:
+                logging.debug('Fetching from pool: %i, posts from page: %i', pool, page)
+                posts = board.getPoolPostsPage(pool, page)
+                if posts:
+                    if page == 1:
+                        db.savePool(pool, posts_id=None, modified=True)
+                    count += db.savePool(pool, posts, modified=True)
+                    page += 1
+                    total += len(posts)
+                else:
+                    count += db.savePool(pool)
+                    logging.debug('Got %i/%i posts from pool %i', count, total, pool)
+                    break
 
     def clean_loop(self, directory, dest, db):
         count = 0

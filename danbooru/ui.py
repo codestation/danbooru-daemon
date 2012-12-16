@@ -180,14 +180,17 @@ class ImageViewer(QtGui.QDialog):
     onNextImage = QtCore.pyqtSignal(QtGui.QDialog)
     onPrevImage = QtCore.pyqtSignal(QtGui.QDialog)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, path=None):
         QtGui.QWidget.__init__(self, parent)
         layout = QtGui.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.pixmap = None
 
         scene = QtGui.QGraphicsScene()
-        self.item = QtGui.QGraphicsPixmapItem()
+        if path:
+            self.item = QtGui.QGraphicsPixmapItem(QtGui.QPixmap(path))
+        else:
+            self.item = QtGui.QGraphicsPixmapItem()
         scene.addItem(self.item)
 
         self.view = ImageView()
@@ -205,8 +208,7 @@ class ImageViewer(QtGui.QDialog):
         if image:
             self.pixmap = QtGui.QPixmap.fromImage(image)
         elif path:
-            self.pixmap = QtGui.QPixmap()
-            self.pixmap.load(path)
+            self.pixmap = QtGui.QPixmap(path)
         if self.pixmap:
             self.item.setPixmap(self.pixmap)
             self.onResize(None)

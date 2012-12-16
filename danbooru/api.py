@@ -33,6 +33,8 @@ class Api(object):
 
     POST_API = "/post/index.json"
     TAG_API = "/tag/index.json"
+    POOL_API = "/pool/index.json"
+    POOL_LIST_API = "/pool/show.json"
 
     WAIT_TIME = 1.2
 
@@ -62,6 +64,14 @@ class Api(object):
             tag, page, limit) + self._loginData()
         return self.getPosts(url, query, blacklist, whitelist)
 
+    def getPoolsPage(self, page):
+        url = "%s%s?page=%i" % (self.host, self.POOL_API, page) + self._loginData()
+        return self.getPools(url)
+
+    def getPoolPostsPage(self, pool_id, page):
+        url = "%s%s?id=%i&page=%i" % (self.host, self.POOL_LIST_API, pool_id, page) + self._loginData()
+        return self.getPoolPosts(url)
+
     def getPostsBefore(self, post_id, tag, query, limit, blacklist=None, whitelist=None):
         url = "%s%s?before_id=%i&tags=%s&limit=%i" % (self.host, self.POST_API,
               post_id, tag, limit) + self._loginData()
@@ -70,22 +80,7 @@ class Api(object):
     def getTagsBefore(self, post_id, tags, limit):
         pass
 
-    def getPosts(self, url, query, blacklist, whitelist):
-        self._wait()
-
-        try:
-            response = urlopen(url)
-        except HTTPError as ex:
-            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
-        except URLError as ex:
-            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
-        except HTTPException as ex:
-            raise DanbooruError("Error: HTTPException")
-        except socket.error as ex:
-            raise DanbooruError("Connection error: %s" % ex)
-
-        results = response.read().decode('utf8')
-        posts = json.loads(results)
+    def _processPosts(self, posts, query=None, blacklist=None, whitelist=None):
         for post in posts:
             # rename key id -> post_id
             post['post_id'] = post['id']
@@ -117,6 +112,64 @@ class Api(object):
             return filter_posts(posts, query)
         else:
             return posts
+
+    def _getData(self, url):
+        self._wait()
+        try:
+            response = urlopen(url)
+        except HTTPError as ex:
+            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
+        except URLError as ex:
+            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
+        except HTTPException as ex:
+            raise DanbooruError("Error: HTTPException")
+        except socket.error as ex:
+            raise DanbooruError("Connection error: %s" % ex)
+        return response.read().decode('utf8')
+
+    def getPosts(self, url, query, blacklist, whitelist):
+        posts = json.loads(self._getData(url))
+        return self._processPosts(posts, query, blacklist, whitelist)
+
+    def getPoolPosts(self, url):
+        self._wait()
+
+        try:
+            response = urlopen(url)
+        except HTTPError as ex:
+            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
+        except URLError as ex:
+            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
+        except HTTPException as ex:
+            raise DanbooruError("Error: HTTPException")
+        except socket.error as ex:
+            raise DanbooruError("Connection error: %s" % ex)
+
+        results = response.read().decode('utf8')
+        pool = json.loads(results)
+        return [post['id'] for post in pool['posts']]
+
+    def getPools(self, url):
+        self._wait()
+
+        try:
+            response = urlopen(url)
+        except HTTPError as ex:
+            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
+        except URLError as ex:
+            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
+        except HTTPException as ex:
+            raise DanbooruError("Error: HTTPException")
+        except socket.error as ex:
+            raise DanbooruError("Connection error: %s" % ex)
+
+        results = response.read().decode('utf8')
+        pools = json.loads(results)
+        for pool in pools:
+            # rename key id -> pool_id
+            pool['pool_id'] = pool['id']
+            del pool['id']
+        return pools
 
     def tagList(self, name):
         self._wait()

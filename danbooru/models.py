@@ -18,6 +18,7 @@ from sqlalchemy import Column, String, Integer
 from sqlalchemy.orm import relationship, relation
 from sqlalchemy.schema import UniqueConstraint, ForeignKey, Table
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy.types import Boolean
 
 
 Base = declarative_base()
@@ -33,20 +34,27 @@ class Model(object):
 
 class Board(Model, Base):
     host = Column(String)
-    alias = Column(String)
+    alias = Column(String, index=True)
     __table_args__ = (UniqueConstraint('host', 'alias'),)
 
 
 class Image(Model, Base):
     width = Column(Integer)
     height = Column(Integer)
-    md5 = Column(String(32), unique=True)
+    md5 = Column(String(32), unique=True, index=True)
     file_ext = Column(String(4))
     file_size = Column(Integer)
 
 
-association_table = Table('tag_post', Base.metadata,
+association_table__tag_post = Table('tag_post', Base.metadata,
     Column('tag_id', Integer, ForeignKey('tag.id', ondelete="CASCADE"),
+           primary_key=True),
+    Column('post_id', Integer, ForeignKey('post.id', ondelete="CASCADE"),
+           primary_key=True)
+)
+
+association_table__pool_post = Table('pool_post', Base.metadata,
+    Column('pool_id', Integer, ForeignKey('pool.id', ondelete="CASCADE"),
            primary_key=True),
     Column('post_id', Integer, ForeignKey('post.id', ondelete="CASCADE"),
            primary_key=True)
@@ -54,7 +62,7 @@ association_table = Table('tag_post', Base.metadata,
 
 
 class Post(Model, Base):
-    post_id = Column(Integer)
+    post_id = Column(Integer, index=True)
     file_url = Column(String)
     author = Column(String)
     creator_id = Column(Integer)
@@ -81,10 +89,29 @@ class Post(Model, Base):
     board = relationship("Board")
     image = relationship("Image")
 
-    tags = relation('Tag', secondary=association_table)
+    tags = relation('Tag', secondary=association_table__tag_post)
+    pools = relation('Pool', secondary=association_table__pool_post)
 
     __table_args__ = (UniqueConstraint('post_id', 'board_id'),)
 
 
 class Tag(Model, Base):
     name = Column(String, nullable=False, index=True, unique=True)
+
+
+class Pool(Model, Base):
+    pool_id = Column(Integer, index=True)
+    name = Column(Integer)
+    created_at = Column(String)
+    updated_at = Column(String)
+    post_count = Column(Integer)
+    user_id = Column(Integer)
+    is_public = Column(Boolean)
+    modified = Column(Boolean)
+
+    board_id = Column(Integer, ForeignKey('board.id', ondelete="CASCADE"))
+    board = relationship("Board")
+
+    posts = relation('Post', secondary=association_table__pool_post)
+
+    __table_args__ = (UniqueConstraint('pool_id', 'board_id'),)

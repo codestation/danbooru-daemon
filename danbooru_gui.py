@@ -35,26 +35,6 @@ class DanbooruGUI(QtGui.QMainWindow):
 
     BASE_DIR = "."
 
-    INFO_FORMAT = ('<table>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td><a href="width:%%i">%%i</a></td></tr>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td><a href="height:%%i">%%i</a></td></tr>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td>%%s</td></tr>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td><a href="rating:%%s">%%s</a></td></tr>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td>%%i</td></tr>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td>%%s</td></tr>'
-                   '<tr><td align="right"><b>%s:</b></td>'
-                   '<td>%%i</td></tr>'
-                   '<tr><td align="right"><b>URL:</b></td>'
-                   '<td><a href="%%s">%%s</a></td></tr>'
-                   '</table>'
-                   )
-
     RATING = {'s': "Safe", 'q': "Questionable", 'e': "Explicit"}
 
     def __init__(self, parent=None):
@@ -63,6 +43,13 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.setupUI()
         self.loadSettings()
         self.setupThumbnailWorker()
+
+    def table_entry(self, title, value, href=None):
+        if href:
+            val = '<td><a href="%s">%s</a></td>' % (href, value)
+        else:
+            val = '<td>%s</td>' % value
+        return '<tr><td align="right"><b>%s:</b></td><td>%s</td></tr>' % (title, val)
 
     def setupThumbnailWorker(self):
         self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
@@ -107,10 +94,6 @@ class DanbooruGUI(QtGui.QMainWindow):
         shortcut.activated.connect(self.toggleInfoPanel)
 
     def loadSettings(self):
-        self.info_values = (self.tr("Width"), self.tr("Height"),
-                            self.tr("Tags"), self.tr("Rating"),
-                            self.tr("Score"), self.tr("From"), self.tr("ID"))
-
         # load user settings
         user_dir = expanduser("~")
         try:
@@ -178,8 +161,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         viewer.loadImage(path=path)
 
     def showImage(self, full_path):
-        viewer = ImageViewer()
-        viewer.loadImage(path=full_path)
+        viewer = ImageViewer(path=full_path)
         viewer.onNextImage.connect(self.nextImage)
         viewer.onPrevImage.connect(self.prevImage)
         viewer.showFullScreen()
@@ -190,6 +172,25 @@ class DanbooruGUI(QtGui.QMainWindow):
     def doubleClicked(self, item):
         path = self.getItemPath(item)
         self.showImage(path)
+
+    def buildInfoTag(self, post):
+        tags = ['<a href="%s">%s</a>' % (tag.name, tag.name) for tag in post.tags]
+        pools = ['<a href="pool:%i">%s</a>' % (pool.pool_id, pool.name) for pool in post.pools]
+
+        table_items = list()
+        table_items.append(self.table_entry(self.tr("Width"), post.image.width, "width:%i" % post.image.width))
+        table_items.append(self.table_entry(self.tr("Height"), post.image.height, "height:%i" % post.image.height))
+        if tags:
+            table_items.append(self.table_entry(self.tr("Tags"), " ".join(tags)))
+        table_items.append(self.table_entry(self.tr("Rating"), self.RATING[post.rating], "rating:%s" % post.rating))
+        table_items.append(self.table_entry(self.tr("Score"), post.score))
+        table_items.append(self.table_entry(self.tr("From"), post.board.host))
+        table_items.append(self.table_entry(self.tr("ID"), post.post_id))
+        if pools:
+            table_items.append(self.table_entry(self.tr("Pools"), " ".join(pools)))
+        page_url = "%s/post/show/%i" % (post.board.host, post.post_id)
+        table_items.append(self.table_entry(self.tr("URL"), page_url, page_url))
+        return "<table>%s</table>" % "".join(table_items)
 
     def selectionChanged(self):
         items = self.listWidget.selectedItems()
@@ -211,16 +212,7 @@ class DanbooruGUI(QtGui.QMainWindow):
                 self.img = QtGui.QIcon().fromTheme("image-x-generic")
 
             self.updatePreview()
-            tags = ['<a href="%s">%s</a>' % (tag.name, tag.name)
-                    for tag in post.tags]
-            tags = " ".join(tags)
-            str_format = self.INFO_FORMAT % self.info_values
-            self.infoLabel.setText(str_format %
-                (img.width, img.width, img.height, img.height,
-                 tags, post.rating, self.RATING[post.rating],
-                 post.score, post.board.host, post.post_id,
-                 "%s/post/show/%i" % (post.board.host, post.post_id),
-                 "%s/post/show/%i" % (post.board.host, post.post_id)))
+            self.infoLabel.setText(self.buildInfoTag(post))
         else:
             self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None

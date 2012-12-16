@@ -62,6 +62,8 @@ def parse_query(text):
                 query['ratio_height'] = int(item.split(":")[2])
             elif item.startswith("limit:"):
                 query['limit'] = item.split(":")[1]
+            elif item.startswith("pool:"):
+                query['pool'] = item.split(":")[1]
             else:
                 query['tags'].append(item)
         return query
