@@ -22,8 +22,8 @@ from os.path import join, expanduser
 from PyQt4 import QtCore, QtGui, uic
 
 from danbooru import utils, ui
-from danbooru.settings import Settings
-from danbooru.database import Database
+from danbooru.utils import Settings
+from danbooru.db import Storage
 from danbooru.error import DanbooruError
 from danbooru.ui import ImageViewer
 
@@ -38,7 +38,7 @@ class DanbooruGUI(QtGui.QMainWindow):
     RATING = {'s': "Safe", 'q': "Questionable", 'e': "Explicit"}
 
     def __init__(self, parent=None):
-        QtGui.QMainWindow.__init__(self, parent)
+        super().__init__(parent)
         self.ui = uic.loadUi(utils.find_resource(__name__, "ui/danbooru.ui"), self)
         self.setupUI()
         self.loadSettings()
@@ -106,7 +106,7 @@ class DanbooruGUI(QtGui.QMainWindow):
             if not cfg.dbname:
                 daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
                 cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
-            self.db = Database(join(daemon_dir, cfg.dbname))
+            self.db = Storage(join(daemon_dir, cfg.dbname))
         except DanbooruError:
             self.statusLabel.setText(self.tr("No config loaded"))
             self.searchButton.setEnabled(False)

@@ -69,7 +69,7 @@ class ThumbnailWorker(QtCore.QThread):
     abort = False
 
     def __init__(self, ListWidget, basedir, parent=None):
-        QtCore.QThread.__init__(self, parent)
+        super().__init__(parent)
         self.widget = ListWidget
         self.basedir = basedir
         user_path = expanduser("~")
@@ -116,7 +116,7 @@ class ImageView(QtGui.QGraphicsView):
     MARGIN = 5
 
     def __init__(self, parent=None):
-        QtGui.QGraphicsView.__init__(self, parent)
+        super().__init__(parent)
         self.mScrollPos = None
 
     def scrollSet(self, pos):
@@ -181,7 +181,7 @@ class ImageViewer(QtGui.QDialog):
     onPrevImage = QtCore.pyqtSignal(QtGui.QDialog)
 
     def __init__(self, parent=None, path=None):
-        QtGui.QWidget.__init__(self, parent)
+        super().__init__(parent)
         layout = QtGui.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.pixmap = None

@@ -14,8 +14,59 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
 import re
-from os.path import exists, join, dirname, abspath
+import logging
+import configparser
+from danbooru.error import DanbooruError
+
+
+class Settings(object):
+
+    def __init__(self, configfile):
+        self.config = configparser.ConfigParser(interpolation=None)
+        if not self.config.read(configfile):
+            raise DanbooruError('No config loaded')
+
+    def set_value(self, key, section):
+        if isinstance(key, tuple):
+            if key[1] == int:
+                setattr(self, key[0], self.config.getint(section, key[0]))
+            elif key[1] == bool:
+                setattr(self, key[0], self.config.getboolean(section, key[0]))
+            else:
+                logging.warn("Unknown type: %s", key[1])
+                setattr(self, key[0], self.config.get(section, key[0]))
+        else:
+            setattr(self, key, self.config.get(section, key))
+
+    def load(self, section, required, optional):
+        try:
+            for key in required:
+                try:
+                    self.set_value(key, section)
+                except configparser.NoOptionError:
+                    self.set_value(key, "default")
+
+            for key in optional:
+                try:
+                    self.set_value(key, section)
+                except configparser.NoOptionError:
+                    try:
+                        self.set_value(key, "default")
+                    except configparser.NoOptionError:
+                        setattr(self, key, optional[key])
+
+        except configparser.NoSectionError:
+            logging.error('The section "%s" does not exist', section)
+        except configparser.NoOptionError:
+            logging.error('The value for "%s" is missing', key)
+        else:
+            return True
+        return False
+
+    def getDict(self):
+        return self.__dict__.copy()
 
 
 def list_generator(list_widget):
@@ -72,14 +123,14 @@ def parse_query(text):
 
 
 def find_resource(base, filename):
-    base_path = [dirname(abspath(base)),
+    base_path = [os.path.dirname(os.path.abspath(base)),
                  "/usr/local/share/danbooru-daemon",
                  "/usr/share/danbooru-daemon"]
 
     for path in base_path:
-        full_path = join(path, filename)
+        full_path = os.path.join(path, filename)
 
-        if exists(full_path):
+        if os.path.exists(full_path):
             return full_path
 
     raise Exception("%s cannot be found." % filename)

@@ -14,12 +14,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
 import logging
-from os import listdir
-from os.path import abspath, join, isdir, isfile
 
 from PyQt4 import QtCore
-from PyKDE4.kdecore import KUrl
+from PyKDE4.kdecore import KUrl  # @UnresolvedImport
 from PyKDE4.nepomuk import Nepomuk  # @UnresolvedImport
 from PyKDE4.soprano import Soprano  # @UnresolvedImport
 
@@ -56,7 +55,7 @@ class NepomukJob(QtCore.QObject):
     _stop = False
 
     def __init__(self, parent=None):
-        QtCore.QObject.__init__(self, parent)
+        super().__init__(parent)
 
     def setDirData(self, path, db):
         self.start_path = path
@@ -71,13 +70,13 @@ class NepomukJob(QtCore.QObject):
 
     def updateDirTags(self, directory):
         loop = QtCore.QEventLoop()
-        for name in listdir(directory):
+        for name in os.listdir(directory):
             if self._stop:
                 break
-            full_path = join(directory, name)
-            if isdir(full_path):
+            full_path = os.path.join(directory, name)
+            if os.path.isdir(full_path):
                 self.updateDirTags(full_path)
-            elif isfile(full_path):
+            elif os.path.isfile(full_path):
                 logging.debug('(%i) Processing %s' % (self.file_count, name))
                 post = self.db.getPost(name)
                 if post:
@@ -104,7 +103,7 @@ class NepomukJob(QtCore.QObject):
 
     def getResource(self, res):
         if isinstance(res, str):
-            absolute_path = abspath(res)
+            absolute_path = os.path.abspath(res)
             return Nepomuk.File(KUrl(absolute_path))
         else:
             return res

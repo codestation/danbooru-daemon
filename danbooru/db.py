@@ -25,7 +25,7 @@ from sqlalchemy.sql.expression import func, ClauseElement, distinct, not_
 from danbooru.models import Board, Post, Image, Tag, Base, Pool
 
 
-class Database(object):
+class Storage(object):
 
     def __init__(self, dbname=""):
         # prepare the engine

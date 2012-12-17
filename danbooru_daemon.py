@@ -27,12 +27,12 @@ from os import listdir, makedirs
 from os.path import join, isdir, isfile, splitext, expanduser
 
 from danbooru.error import DanbooruError
-from danbooru.api import Api
-from danbooru.database import Database
-from danbooru.settings import Settings
+from danbooru.api import DanbooruApi
+from danbooru.db import Storage
+from danbooru.utils import Settings
 from danbooru.downloader import Downloader
 from danbooru.utils import parse_query
-from danbooru.gelbooru_api import GelbooruAPI
+from danbooru.api import GelbooruAPI
 
 
 class Daemon(object):
@@ -41,26 +41,26 @@ class Daemon(object):
     abort_list = {}
 
     config_required = [
-                       'api_mode',
-                       'host',
-                       'username',
-                       'password',
-                       'salt',
-                       ('limit', int),
-                       'download_path',
-                       'log_level',
-                       'log_file',
-                       'fetch_mode',
-                       ('skip_file_check', bool),
-                       ]
+       'api_mode',
+       'host',
+       'username',
+       'password',
+       'salt',
+       ('limit', int),
+       'download_path',
+       'log_level',
+       'log_file',
+       'fetch_mode',
+       ('skip_file_check', bool),
+    ]
 
     config_optional = {
-                       'default_tags': None,
-                       'blacklist': None,
-                       'whitelist': None,
-                       'dbname': None,
-                        ('max_tags', int): 2,
-                    }
+       'default_tags': None,
+       'blacklist': None,
+       'whitelist': None,
+       'dbname': None,
+        ('max_tags', int): 2,
+    }
 
     def parseArgs(self):
         parser = argparse.ArgumentParser()
@@ -92,7 +92,7 @@ class Daemon(object):
                 logging.error('Invalid log_level in config: %s' % cfg.log_level)
                 sys.exit(1)
             cfg.log_level = numeric_level
-        return cfg
+        return cfg.getDict()
 
     def parseTags(self, args, cfg):
         # use default tags from file
@@ -165,9 +165,12 @@ class Daemon(object):
 
         cfg = self.readConfig(args.config, args.section, self.config_required, self.config_optional)
 
-        logging.basicConfig(level=cfg.log_level, filename=cfg.log_file,
-                            format='%(asctime)s %(levelname)s: %(message)s',
-                            datefmt='%I:%M:%S %p')
+        logging.basicConfig(
+            level=cfg['log_level'],
+            filename=cfg['log_file'],
+            format='%(asctime)s %(levelname)s: %(message)s',
+            datefmt='%I:%M:%S %p'
+        )
 
         self.query = self.parseTags(args, cfg)
 
@@ -178,14 +181,14 @@ class Daemon(object):
             makedirs(daemon_dir, exist_ok=True)
             cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
 
-        db = Database(cfg.dbname)
+        db = Storage(cfg.dbname)
         db.setHost(cfg.host, args.section)
 
         if args.action == "daemon":
             self.run_daemon(args, db)
         elif args.action == "update":
             if cfg.api_mode == "danbooru":
-                board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+                board = DanbooruApi(cfg.host, cfg.username, cfg.password, cfg.salt)
             elif cfg.api_mode == "gelbooru":
                 board = GelbooruAPI(cfg.host)
             for tag in self.query['tags']:
@@ -196,13 +199,13 @@ class Daemon(object):
         elif args.action == "nepomuk":
             self.run_nepomuk(cfg, db)
         elif args.action == "tags":
-            board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            board = DanbooruApi(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_tags(args, db, board)
         elif args.action == "pools":
-            board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            board = DanbooruApi(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_pools(db, board)
         elif args.action == "pool_posts":
-            board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+            board = DanbooruApi(cfg.host, cfg.username, cfg.password, cfg.salt)
             self.run_pool_posts(db, board)
         elif args.action == "cleanup":
             self.cleanup(cfg, db, args, cfg.download_path)
@@ -227,7 +230,7 @@ class Daemon(object):
                     return
                 cfg = self.readConfig(args.config, section, self.config_required, self.config_optional)
                 db.setHost(cfg.host, section)
-                board = Api(cfg.host, cfg.username, cfg.password, cfg.salt)
+                board = DanbooruApi(cfg.host, cfg.username, cfg.password, cfg.salt)
                 logging.debug(">>> Run upload mode for %s", section)
                 for tag in self.query['tags']:
                     logging.debug("processing tag [%s]", tag)

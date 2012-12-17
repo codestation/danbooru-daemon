@@ -16,75 +16,63 @@
 
 import re
 import json
+import time
 import socket
 import hashlib
 import logging
-
+import urllib.parse
+import xml.dom.minidom
 from urllib.request import urlopen
-from urllib.error import URLError, HTTPError
 from http.client import HTTPException
-from time import sleep, time, gmtime, strftime
+from urllib.error import URLError, HTTPError
 
 from danbooru.error import DanbooruError
 from danbooru.utils import filter_posts
 
 
-class Api(object):
-
-    POST_API = "/post/index.json"
-    TAG_API = "/tag/index.json"
-    POOL_API = "/pool/index.json"
-    POOL_LIST_API = "/pool/show.json"
+class GenericApi(object):
 
     WAIT_TIME = 1.2
 
-    def __init__(self, host, username, password, salt):
+    def __init__(self, host):
         self.host = host
-        self.username = username
-        self.password = password
-        self.salt = salt
         self._delta_time = 0
-        self._login_string = None
 
     def _wait(self):
         self._delta_time = time() - self._delta_time
         if self._delta_time < self.WAIT_TIME:
-            sleep(self.WAIT_TIME - self._delta_time)
+            time.sleep(self.WAIT_TIME - self._delta_time)
 
-    def _loginData(self):
-        if not self._login_string:
-            sha1data = hashlib.sha1((self.salt % self.password).encode('utf8'))
-            sha1_password = sha1data.hexdigest()
-            # save the result to use it in the next calls
-            self._login_string = '&login=%s&password_hash=%s' % (self.username, sha1_password)
-        return self._login_string
+    def _getData(self, url):
+        self._wait()
+        try:
+            response = urlopen(url)
+        except HTTPError as ex:
+            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
+        except URLError as ex:
+            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
+        except HTTPException as ex:
+            raise DanbooruError("Error: HTTPException")
+        except socket.error as ex:
+            raise DanbooruError("Connection error: %s" % ex)
+        return response.read().decode('utf8')
 
-    def getPostsPage(self, tag, query, page, limit, blacklist=None, whitelist=None):
-        url = "%s%s?tags=%s&page=%i&limit=%i" % (self.host, self.POST_API,
-            tag, page, limit) + self._loginData()
-        return self.getPosts(url, query, blacklist, whitelist)
+    def getDictFromJSON(self, url):
+        return json.loads(self._getData(url))
 
-    def getPoolsPage(self, page):
-        url = "%s%s?page=%i" % (self.host, self.POOL_API, page) + self._loginData()
-        return self.getPools(url)
-
-    def getPoolPostsPage(self, pool_id, page):
-        url = "%s%s?id=%i&page=%i" % (self.host, self.POOL_LIST_API, pool_id, page) + self._loginData()
-        return self.getPoolPosts(url)
-
-    def getPostsBefore(self, post_id, tag, query, limit, blacklist=None, whitelist=None):
-        url = "%s%s?before_id=%i&tags=%s&limit=%i" % (self.host, self.POST_API,
-              post_id, tag, limit) + self._loginData()
-        return self.getPosts(url, query, blacklist, whitelist)
-
-    def getTagsBefore(self, post_id, tags, limit):
-        pass
+    def getDictFromXML(self, url):
+        dom = xml.dom.minidom.parseString(self._getData(url))
+        posts = []
+        if dom.childNodes:
+            for node in dom.childNodes[0].childNodes:
+                if isinstance(node, xml.dom.minidom.Element):
+                    posts.append(dict(node.attributes.items()))
+        return posts
 
     def _processPosts(self, posts, query=None, blacklist=None, whitelist=None):
         for post in posts:
             # rename key id -> post_id
-            post['post_id'] = post['id']
-            del post['id']
+            post['post_id'] = post.pop('id')
             #remove all extra spaces
             post['tags'] = re.sub(' +', ' ', post['tags']).split(' ')
             #remove duplicates
@@ -94,7 +82,10 @@ class Api(object):
             if not "has_notes" in post:
                 post['has_notes'] = None
             if "created_at" in post and isinstance(post['created_at'], dict):
-                post['created_at'] = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime(post['created_at']['s']))
+                post['created_at'] = time.strftime(
+                    "%a, %d %b %Y %H:%M:%S +0000",
+                    time.gmtime(post['created_at']['s'])
+                )
 
         if blacklist:
             post_count = len(posts)
@@ -113,58 +104,73 @@ class Api(object):
         else:
             return posts
 
-    def _getData(self, url):
-        self._wait()
-        try:
-            response = urlopen(url)
-        except HTTPError as ex:
-            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
-        except URLError as ex:
-            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
-        except HTTPException as ex:
-            raise DanbooruError("Error: HTTPException")
-        except socket.error as ex:
-            raise DanbooruError("Connection error: %s" % ex)
-        return response.read().decode('utf8')
+    def setLogin(self, login, password, salt):
+        sha1data = hashlib.sha1((salt % password).encode('utf8'))
+        self.login = login
+        self.hash = sha1data.hexdigest()
+
+
+class DanbooruApi(GenericApi):
+
+    POST_API = "/post/index.json"
+    TAG_API = "/tag/index.json"
+    POOL_API = "/pool/index.json"
+    POOL_LIST_API = "/pool/show.json"
+
+    def getPostsPage(self, tags, query, page, limit, blacklist=None, whitelist=None):
+        args = urllib.parse.urlencode({
+            'tags': tags,
+            'page': page,
+            'limit': limit,
+            'login': self.login,
+            'password_hash': self.hash,
+        })
+        url = "%s%s?%s" % (self.host, self.POST_API, args)
+        return self.getPosts(url, query, blacklist, whitelist)
+
+    def getPoolsPage(self, page):
+        args = urllib.parse.urlencode({
+            'page': page,
+            'login': self.login,
+            'password_hash': self.hash,
+        })
+        url = "%s%s?%s" % (self.host, self.POOL_API, args)
+        return self.getPools(url)
+
+    def getPoolPostsPage(self, pool_id, page):
+        args = urllib.parse.urlencode({
+            'id': pool_id,
+            'page': page,
+            'login': self.login,
+            'password_hash': self.hash,
+        })
+        url = "%s%s?%s" % (self.host, self.POOL_LIST_API, args)
+        return self.getPoolPosts(url)
+
+    def getPostsBefore(self, post_id, tags, query, limit, blacklist=None, whitelist=None):
+        args = urllib.parse.urlencode({
+            'before_id': post_id,
+            'tags': tags,
+            'limit': limit,
+            'login': self.login,
+            'password_hash': self.hash,
+        })
+        url = "%s%s?%s" % (self.host, self.POST_API, args)
+        return self.getPosts(url, query, blacklist, whitelist)
+
+    def getTagsBefore(self, post_id, tags, limit):
+        pass
 
     def getPosts(self, url, query, blacklist, whitelist):
-        posts = json.loads(self._getData(url))
+        posts = self.getDictFromJSON(url)
         return self._processPosts(posts, query, blacklist, whitelist)
 
     def getPoolPosts(self, url):
-        self._wait()
-
-        try:
-            response = urlopen(url)
-        except HTTPError as ex:
-            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
-        except URLError as ex:
-            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
-        except HTTPException as ex:
-            raise DanbooruError("Error: HTTPException")
-        except socket.error as ex:
-            raise DanbooruError("Connection error: %s" % ex)
-
-        results = response.read().decode('utf8')
-        pool = json.loads(results)
+        pool = self.getDictFromJSON(url)
         return [post['id'] for post in pool['posts']]
 
     def getPools(self, url):
-        self._wait()
-
-        try:
-            response = urlopen(url)
-        except HTTPError as ex:
-            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
-        except URLError as ex:
-            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
-        except HTTPException as ex:
-            raise DanbooruError("Error: HTTPException")
-        except socket.error as ex:
-            raise DanbooruError("Connection error: %s" % ex)
-
-        results = response.read().decode('utf8')
-        pools = json.loads(results)
+        pools = self.getDictFromJSON(url)
         for pool in pools:
             # rename key id -> pool_id
             pool['pool_id'] = pool['id']
@@ -172,18 +178,30 @@ class Api(object):
         return pools
 
     def tagList(self, name):
-        self._wait()
-        url = self.host + self.TAG_API + '?name=%s' % name + self._loginData()
-        try:
-            response = urlopen(url)
-            results = response.read().decode('utf8')
-            tags = json.loads(results)
-            return tags
-        except HTTPError as ex:
-            raise DanbooruError("Error %i: %s" % (ex.code, ex.msg))
-        except URLError as ex:
-            raise DanbooruError("%s (%s)" % (ex.reason, self.host))
-        except HTTPException as ex:
-            raise DanbooruError("Error: HTTPException")
-        except socket.error as ex:
-            raise DanbooruError("Connection error: %s" % ex)
+        args = urllib.parse.urlencode({
+            'name': name,
+            'login': self.login,
+            'password_hash': self.hash,
+        })
+        url = "%s%s?%s" % (self.host, self.TAG_API, args)
+        return self.getDictFromJSON(url)
+
+
+class GelbooruAPI(GenericApi):
+
+    POST_API = "/index.php?page=dapi&s=post&q=index"
+
+    def getPostsPage(self, tags, query, page, limit, blacklist=None, whitelist=None):
+        args = urllib.parse.urlencode({
+            'tags': tags,
+            'pid': page,
+            'limit': limit,
+            'login': self.login,
+            'password_hash': self.hash,
+        })
+        url = "%s%s?%s" % (self.host, self.POST_API, args)
+        return self.getPosts(url, query, blacklist, whitelist)
+
+    def getPosts(self, url, query, blacklist, whitelist):
+        posts = self.getDictFromXML(url)
+        return self._processPosts(posts, query, blacklist, whitelist)
