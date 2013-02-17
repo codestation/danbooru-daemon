@@ -20,7 +20,6 @@ import sys
 import time
 import logging
 import hashlib
-import requests
 import configparser
 from danbooru.error import DanbooruError
 
@@ -36,28 +35,6 @@ def delay(method):
             time.sleep(__WAIT_TIME__ - __DELTA_TIME__)
         method(*args, **kwargs)
     return wrapper
-
-SECTION_REQUIRED = [
-   'api_mode',
-   'host',
-   'username',
-   'password',
-   'salt',
-   ('limit', int),
-   'download_path',
-   'log_level',
-   'log_file',
-   'fetch_mode',
-   ('skip_file_check', bool),
-]
-
-SECTION_OPTIONAL = {
-   'default_tags': None,
-   'blacklist': None,
-   'whitelist': None,
-   'dbname': None,
-    ('max_tags', int): 2,
-}
 
 _UNSET = object()
 
