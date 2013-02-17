@@ -29,7 +29,6 @@ setup(name='danbooru-daemon',
       packages=['danbooru'],
       scripts=['danbooru_daemon', 'danbooru_gui'],
       data_files=[
-                  ('share/danbooru-daemon/ui', ['ui/query-clear.png', 'ui/danbooru.ui']),
-                  ('share/danbooru-daemon', ['sample-config.cfg', 'README'])
-                  ]
-     )
+          ('share/danbooru-daemon/ui', ['ui/query-clear.png', 'ui/danbooru.ui']),
+          ('share/danbooru-daemon', ['sample-config.cfg', 'README'])
+      ], requires=['requests', 'sqlalchemy'])

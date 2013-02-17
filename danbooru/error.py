@@ -16,9 +16,9 @@
 
 
 class DanbooruError(Exception):
-    '''Base class for Danbooru  errors'''
+    """Base class for Danbooru  errors"""
 
     @property
     def message(self):
-        '''Returns the first argument used to construct this error.'''
+        """Returns the first argument used to construct this error."""
         return self.args[0]

@@ -16,9 +16,50 @@
 
 import os
 import re
+import sys
+import time
 import logging
+import hashlib
+import requests
 import configparser
 from danbooru.error import DanbooruError
+
+__DELTA_TIME__ = 0
+__WAIT_TIME__ = 1.2
+
+
+def delay(method):
+    def wrapper(*args, **kwargs):
+        global __DELTA_TIME__
+        __DELTA_TIME__ = time.time() - __DELTA_TIME__
+        if __DELTA_TIME__ < __WAIT_TIME__:
+            time.sleep(__WAIT_TIME__ - __DELTA_TIME__)
+        method(*args, **kwargs)
+    return wrapper
+
+SECTION_REQUIRED = [
+   'api_mode',
+   'host',
+   'username',
+   'password',
+   'salt',
+   ('limit', int),
+   'download_path',
+   'log_level',
+   'log_file',
+   'fetch_mode',
+   ('skip_file_check', bool),
+]
+
+SECTION_OPTIONAL = {
+   'default_tags': None,
+   'blacklist': None,
+   'whitelist': None,
+   'dbname': None,
+    ('max_tags', int): 2,
+}
+
+_UNSET = object()
 
 
 class Settings(object):
@@ -28,45 +69,39 @@ class Settings(object):
         if not self.config.read(configfile):
             raise DanbooruError('No config loaded')
 
-    def set_value(self, key, section):
+    def _setValue(self, key, section):
         if isinstance(key, tuple):
             if key[1] == int:
-                setattr(self, key[0], self.config.getint(section, key[0]))
+                value = self.config.getint(section, key[0])
             elif key[1] == bool:
-                setattr(self, key[0], self.config.getboolean(section, key[0]))
+                value = self.config.getboolean(section, key[0])
             else:
-                logging.warn("Unknown type: %s", key[1])
-                setattr(self, key[0], self.config.get(section, key[0]))
+                logging.warning("Unknown type: %s", key[1])
+                value = self.config.get(section, key[0])
+            setattr(self, key[0], value)
         else:
-            setattr(self, key, self.config.get(section, key))
+            value = self.config.get(section, key)
+            setattr(self, key, value)
+        return value
 
-    def load(self, section, required, optional):
+    def loadValue(self, key, section, default=_UNSET):
+        if isinstance(key, list):
+            return {k: self._loadValue(k, section, default) for k in key}
+        else:
+            return self._loadValue(key, section, default)
+
+    def _loadValue(self, key, section, default=_UNSET):
         try:
-            for key in required:
-                try:
-                    self.set_value(key, section)
-                except configparser.NoOptionError:
-                    self.set_value(key, "default")
-
-            for key in optional:
-                try:
-                    self.set_value(key, section)
-                except configparser.NoOptionError:
-                    try:
-                        self.set_value(key, "default")
-                    except configparser.NoOptionError:
-                        setattr(self, key, optional[key])
-
-        except configparser.NoSectionError:
-            logging.error('The section "%s" does not exist', section)
+            return self._setValue(key, section)
         except configparser.NoOptionError:
-            logging.error('The value for "%s" is missing', key)
-        else:
-            return True
-        return False
-
-    def getDict(self):
-        return self.__dict__.copy()
+            if section not in ['general', 'default']:
+                return self._loadValue(key, 'default', default)
+            if default is _UNSET:
+                raise
+            else:
+                logging.warning("%s isn't defined in config file", key)
+                setattr(self, key, default)
+                return default
 
 
 def list_generator(list_widget):
@@ -90,15 +125,15 @@ def parse_dimension(term, dim):
 
 def parse_query(text):
     query = {}
-    query['tags'] = []
+    tags = []
 
     if isinstance(text, list):
         items = text
     else:
         items = re.sub(' +', ' ', text).split(' ')
 
-    try:
-        for item in items:
+    for item in items:
+        try:
             if item.startswith("site:"):
                 query['site'] = item.split(":")[1]
             elif item.startswith("rating:"):
@@ -116,10 +151,10 @@ def parse_query(text):
             elif item.startswith("pool:"):
                 query['pool'] = item.split(":")[1]
             else:
-                query['tags'].append(item)
-        return query
-    except (ValueError, TypeError, IndexError):
-        return item
+                tags.append(item)
+        except (ValueError, TypeError, IndexError):
+            return item
+    return tags, query
 
 
 def find_resource(base, filename):
@@ -174,3 +209,59 @@ def filter_posts(posts, query):
 def remove_duplicates(posts):
     posts[:] = list(dict((x['id'], x) for x in posts).values())
     return sorted(posts, key=lambda k: k['id'], reverse=True)
+
+
+def default_dbpath():
+    user_dir = os.path.expanduser("~")
+    db_dir = os.path.join(user_dir, ".local/share/danbooru-daemon")
+    os.makedirs(db_dir, exist_ok=True)
+    return os.path.join(db_dir, "danbooru-db.sqlite")
+
+
+def md5sum(filename):
+    md5 = hashlib.md5()
+    with open(filename, 'rb') as f:
+        for chunk in iter(lambda: f.read(128 * md5.block_size), b''):
+            md5.update(chunk)
+    return md5.hexdigest()
+
+
+def db_page_query(q):
+    offset = 0
+    while True:
+        r = False
+        for elem in q.limit(1000).offset(offset):
+            r = True
+            yield elem
+        offset += 1000
+        if not r:
+            break
+
+
+def getExecPath():
+    try:
+        sFile = os.path.abspath(sys.modules['__main__'].__file__)
+    except:
+        sFile = sys.executable
+    return os.path.dirname(sFile)
+
+
+def get_resource_paths():
+    return [getExecPath(),
+            '/usr/local/share/danbooru-daemon',
+            '/usr/share/danbooru-daemon']
+
+
+def retry_if_except(func, *args, max_retries=3, exception=Exception, reraise=True):
+    while True:
+        try:
+            return func(*args)
+        except exception:
+            if max_retries > 0:
+                logging.warning("Exception in %s (%i tries left)", func.__name__, max_retries)
+                max_retries -= 1
+            else:
+                if reraise:
+                    raise
+                else:
+                    return

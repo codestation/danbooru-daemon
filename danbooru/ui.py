@@ -14,12 +14,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
 import time
-from os import makedirs
-from PyQt4 import QtCore, QtGui
-from os.path import basename, splitext, exists, join, expanduser
+from PyQt4 import QtCore, QtGui, uic
 
 from danbooru.models import Post
+from danbooru.utils import get_resource_paths
+from danbooru.error import DanbooruError
 
 
 class ThumbnailCache(object):
@@ -28,17 +29,17 @@ class ThumbnailCache(object):
 
     def __init__(self, path):
         self.path = path
-        makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
 
     def getThumbnail(self, path):
-        if exists(path):
-            base = splitext(basename(path))[0]
+        if os.path.exists(path):
+            base = os.path.splitext(os.path.basename(path))[0]
             image = QtGui.QImage()
-            if image.load(join(self.path, base + ".png"), format="png"):
+            if image.load(os.path.join(self.path, base + ".png"), format="png"):
                 return image
             else:
                 image = self.scaleImage(path, self.MAX_SIZE)
-                image.save(join(self.path, base + ".png"), format="png")
+                image.save(os.path.join(self.path, base + ".png"), format="png")
                 return image
         else:
             #TODO: get preview image from the Internet
@@ -72,11 +73,12 @@ class ThumbnailWorker(QtCore.QThread):
         super().__init__(parent)
         self.widget = ListWidget
         self.basedir = basedir
-        user_path = expanduser("~")
-        self.thumbnail_dir = join(user_path, ".cache/danbooru-daemon/thumbnails")
-        makedirs(self.thumbnail_dir, exist_ok=True)
+        user_path = os.path.expanduser("~")
+        self.thumbnail_dir = os.path.join(user_path, ".cache/danbooru-daemon/thumbnails")
+        os.makedirs(self.thumbnail_dir, exist_ok=True)
 
-    def setData(self, query, db):
+    def setData(self, tags, query, db):
+        self.tags = tags
         self.query = query
         self.db = db
 
@@ -93,8 +95,8 @@ class ThumbnailWorker(QtCore.QThread):
             self.db.setHost(host=None, alias=self.query['site'])
         else:
             self.db.clearHost()
-        if self.query.get('tags'):
-            posts = self.db.getANDPosts(self.query['tags'], limit=200, extra_items=self.query)
+        if self.tags:
+            posts = self.db.getANDPosts(self.tags, limit=200, extra_items=self.query)
         else:
             posts = self.db.getPosts(200, extra_items=self.query)
 
@@ -106,7 +108,7 @@ class ThumbnailWorker(QtCore.QThread):
                     time.sleep(1)
                     break
                 img = post.image
-                full_path = join(self.basedir, img.md5[0], img.md5 + img.file_ext)
+                full_path = os.path.join(self.basedir, img.md5[0], img.md5 + img.file_ext)
                 image = th.getThumbnail(full_path)
                 self.makeIconSignal.emit(post, image)
 
@@ -155,7 +157,7 @@ class ImageView(QtGui.QGraphicsView):
         if mouseWarp:
             QtGui.QCursor.setPos(mousePos + screenDelta)
             self.mScrollPos = self.scrollGet()
-        elif self.mScrollPos != None:
+        elif self.mScrollPos is not None:
             self.scrollSet(self.mScrollPos)
             self.mScrollPos = None
 
@@ -164,10 +166,7 @@ class ImageView(QtGui.QGraphicsView):
 
     def keyPressEvent(self, event):
         # let pass the keys to the parent
-        key = event.key()
-        if key == QtCore.Qt.Key_Left:
-            event.ignore()
-        elif key == QtCore.Qt.Key_Right:
+        if event.key() in [QtCore.Qt.Key_Left, QtCore.Qt.Key_Right]:
             event.ignore()
 
 
@@ -255,3 +254,21 @@ def getScaledPixmap(image, size):
         return QtGui.QPixmap.fromImage(img)
     else:
         return img
+
+
+def load_ui(uifile, baseinstance):
+    for path in get_resource_paths():
+        try:
+            return uic.loadUi(os.path.join(path, uifile), baseinstance)
+        except:
+            pass
+    else:
+        raise DanbooruError("Cannot load UI file")
+
+
+def load_translation(file, app):
+    translator = QtCore.QTranslator(app)
+    for path in get_resource_paths():
+        if translator.load(file + '.' + QtCore.QLocale.system().name(), path):
+            app.installTranslator(translator)
+            break

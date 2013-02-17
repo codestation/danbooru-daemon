@@ -15,34 +15,85 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
 import sys
 import webbrowser
-from locale import getlocale
-from os.path import join, expanduser
-from PyQt4 import QtCore, QtGui, uic
+from os.path import join
+from PyQt4 import QtCore, QtGui
 
-from danbooru import utils, ui
 from danbooru.utils import Settings
+from danbooru.utils import default_dbpath
+from danbooru.utils import parse_query
+from danbooru.utils import get_resource_paths, list_generator
 from danbooru.db import Storage
-from danbooru.error import DanbooruError
-from danbooru.ui import ImageViewer
+from danbooru.ui import ImageViewer, ThumbnailWorker, load_ui, getScaledPixmap,\
+    load_translation
+
+
+class DanbooruSettings(QtGui.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.ui = load_ui('ui/settings.ui', self)
 
 
 class DanbooruGUI(QtGui.QMainWindow):
 
     SLIDER_MULT = 16
-    img = None
-
-    BASE_DIR = "."
-
     RATING = {'s': "Safe", 'q': "Questionable", 'e': "Explicit"}
+    img = None
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.ui = uic.loadUi(utils.find_resource(__name__, "ui/danbooru.ui"), self)
+        load_ui('ui/danbooru.ui', self)
         self.setupUI()
         self.loadSettings()
         self.setupThumbnailWorker()
+
+    def setupUI(self):
+        # Connect signals
+        self.searchButton.clicked.connect(self.startSearch)
+        self.zoomSlider.sliderMoved.connect(self.sliderMove)
+        self.queryBox.returnPressed.connect(self.startSearch)
+        self.queryBox.textChanged.connect(self.updateClearButton)
+        self.infoLabel.linkActivated.connect(self.tagSelected)
+        self.listWidget.itemEntered.connect(self.itemOver)
+        self.listWidget.itemDoubleClicked.connect(self.doubleClicked)
+        self.listWidget.itemSelectionChanged.connect(self.selectionChanged)
+
+        # Event overrides
+        self.infoDock.resizeEvent = self.updatePreview
+
+        # Set settings
+        pixels = self.zoomSlider.value() * self.SLIDER_MULT
+        self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
+        self.listWidget.setDragEnabled(False)
+
+        # Add clear button inside the queryBox
+        self.clearButton = QtGui.QPushButton(self.queryBox)
+        self.clearButton.setVisible(False)
+        self.clearButton.setStyleSheet('QPushButton { border: none; padding: 0px; }')
+        self.clearButton.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
+        self.clearButton.clicked.connect(self.queryBox.clear)
+
+        for path in get_resource_paths():
+            icon = QtGui.QIcon(os.path.join(path, 'ui/query-clear.png'))
+            if icon.availableSizes():
+                self.clearButton.setIcon(icon)
+                break
+
+        layout = QtGui.QHBoxLayout(self.queryBox)
+        self.queryBox.setLayout(layout)
+        layout.addStretch()
+        layout.addWidget(self.clearButton)
+
+        # Add a keyboard shortcut to toggle visibility of the info panel
+        info_shortcut = QtGui.QShortcut(QtGui.QKeySequence('F11'), self)
+        info_shortcut.activated.connect(self.toggleInfoPanel)
+
+        # Create systray icon
+        self.sysTray = QtGui.QSystemTrayIcon(self)
+        self.sysTray.setIcon(QtGui.QIcon().fromTheme('image-loading'))
+        self.sysTray.activated.connect(self.restoreWindow)
 
     def table_entry(self, title, value, href=None):
         if href:
@@ -52,65 +103,28 @@ class DanbooruGUI(QtGui.QMainWindow):
         return '<tr><td align="right"><b>%s:</b></td><td>%s</td></tr>' % (title, val)
 
     def setupThumbnailWorker(self):
-        self.thumb = ui.ThumbnailWorker(self.listWidget, self.BASE_DIR)
+        self.thumb = ThumbnailWorker(self.listWidget, self.base_dir)
         self.thumb.makeIconSignal.connect(self.makeIcon)
         self.thumb.setStatusSignal.connect(self.setStatus)
         self.thumb.clearWidgetListSignal.connect(self.clearWidgetList)
 
-    def setupUI(self):
-        # UI signals
-        self.searchButton.clicked.connect(self.startSearch)
-        self.queryBox.returnPressed.connect(self.startSearch)
-        self.zoomSlider.sliderMoved.connect(self.sliderMove)
-        self.listWidget.itemEntered.connect(self.itemOver)
-        self.listWidget.itemSelectionChanged.connect(self.selectionChanged)
-        self.listWidget.itemDoubleClicked.connect(self.doubleClicked)
-        self.infoLabel.linkActivated.connect(self.tagSelected)
-
-        # UI event overrides
-        self.infoDock.resizeEvent = self.updatePreview
-
-        # UI settings
-        pixels = self.zoomSlider.value() * self.SLIDER_MULT
-        self.zoomSlider.setToolTip("Size: %i pixels" % pixels)
-        self.listWidget.setDragEnabled(False)
-
-        # Add clear button on queryBox
-        self.clearButton = QtGui.QPushButton(self.queryBox)
-        self.clearButton.setVisible(False)
-        self.clearButton.setStyleSheet("QPushButton { border: none; padding: 0px; }")
-        self.clearButton.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
-        icon = QtGui.QIcon(utils.find_resource(__name__, "ui/query-clear.png"))
-        self.clearButton.setIcon(icon)
-        self.clearButton.clicked.connect(self.queryBox.clear)
-        self.queryBox.textChanged.connect(self.updateClearButton)
-        layout = QtGui.QHBoxLayout(self.queryBox)
-        self.queryBox.setLayout(layout)
-        layout.addStretch()
-        layout.addWidget(self.clearButton)
-
-        # add a keyboard shortcut to toggle visibility of the info panel
-        shortcut = QtGui.QShortcut(QtGui.QKeySequence("F11"), self)
-        shortcut.activated.connect(self.toggleInfoPanel)
-
     def loadSettings(self):
         # load user settings
-        user_dir = expanduser("~")
-        try:
-            cfg = Settings(join(user_dir, ".danbooru-daemon.cfg"))
-            cfg.load("default", ['download_path'], {'dbname': None})
+        user_dir = os.path.expanduser("~")
+        configfile = os.path.join(user_dir, '.danbooru-daemon.cfg')
+        config = Settings(configfile)
+        dbname = config.loadValue('dbname', 'general', default_dbpath())
+        self.db = Storage(dbname)
+        self.base_dir = config.loadValue('download_path', 'general', '.')
 
-            # Get the base path for image search
-            self.BASE_DIR = cfg.download_path
+#        except DanbooruError:
+#            self.statusLabel.setText(self.tr("No config loaded"))
+#            self.searchButton.setEnabled(False)
+#            self.queryBox.returnPressed.disconnect(self.startSearch)
 
-            if not cfg.dbname:
-                daemon_dir = join(user_dir, ".local/share/danbooru-daemon")
-                cfg.dbname = join(daemon_dir, "danbooru-db.sqlite")
-            self.db = Storage(join(daemon_dir, cfg.dbname))
-        except DanbooruError:
-            self.statusLabel.setText(self.tr("No config loaded"))
-            self.searchButton.setEnabled(False)
-            self.queryBox.returnPressed.disconnect(self.startSearch)
+    def restoreWindow(self, reason):  # @UnusedVariable
+        self.sysTray.hide()
+        self.showNormal()
 
     def toggleInfoPanel(self):
         self.infoDock.setVisible(not self.infoDock.isVisible())
@@ -137,16 +151,16 @@ class DanbooruGUI(QtGui.QMainWindow):
 
             size = self.previewWidget.size()
             if isinstance(self.img, QtGui.QIcon):
-                self.previewWidget.setPixmap(ui.getScaledPixmap(self.img.pixmap(256, 256), size))
+                self.previewWidget.setPixmap(getScaledPixmap(self.img.pixmap(256, 256), size))
             else:
-                self.previewWidget.setPixmap(ui.getScaledPixmap(self.img, size))
+                self.previewWidget.setPixmap(getScaledPixmap(self.img, size))
 
     def getItemPath(self, item):
         post = item.data(QtCore.Qt.UserRole)
         sess = self.db.DBsession()
         post = sess.merge(post)
         img = post.image
-        return join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
+        return join(self.base_dir, img.md5[0], img.md5 + img.file_ext)
 
     def nextImage(self, viewer):
         self.listWidget.setCurrentRow(self.listWidget.currentRow() + 1, QtGui.QItemSelectionModel.SelectCurrent)
@@ -188,9 +202,9 @@ class DanbooruGUI(QtGui.QMainWindow):
         table_items.append(self.table_entry(self.tr("ID"), post.post_id))
         if pools:
             table_items.append(self.table_entry(self.tr("Pools"), " ".join(pools)))
-        page_url = "%s/post/show/%i" % (post.board.host, post.post_id)
+        page_url = '%s/post/show/%i' % (post.board.host, post.post_id)
         table_items.append(self.table_entry(self.tr("URL"), page_url, page_url))
-        return "<table>%s</table>" % "".join(table_items)
+        return '<table>%s</table>' % ''.join(table_items)
 
     def selectionChanged(self):
         items = self.listWidget.selectedItems()
@@ -205,11 +219,11 @@ class DanbooruGUI(QtGui.QMainWindow):
             sess = self.db.DBsession()
             post = sess.merge(post)
             img = post.image
-            full_path = join(self.BASE_DIR, img.md5[0], img.md5 + img.file_ext)
+            full_path = join(self.base_dir, img.md5[0], img.md5 + img.file_ext)
             self.img = QtGui.QImage(full_path)
 
             if not self.img or self.img.byteCount() == 0:
-                self.img = QtGui.QIcon().fromTheme("image-x-generic")
+                self.img = QtGui.QIcon().fromTheme('image-x-generic')
 
             self.updatePreview()
             self.infoLabel.setText(self.buildInfoTag(post))
@@ -217,11 +231,18 @@ class DanbooruGUI(QtGui.QMainWindow):
             self.nameLabel.setText(self.tr("%i selected items") % len(items))
             self.img = None
 
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.WindowStateChange:
+            if self.windowState() & QtCore.Qt.WindowMinimized:
+                self.hide()
+                self.sysTray.show()
+                event.ignore()
+
     def tagSelected(self, tag):
-        if tag.startswith("http://"):
+        if tag.startswith('http://'):
             webbrowser.open(tag)
         else:
-            self.queryBox.setText(self.queryBox.text() + " %s" % tag)
+            self.queryBox.setText(' '.join([self.queryBox.text(), tag]))
             self.startSearch()
 
     def makeIcon(self, post, image):
@@ -242,14 +263,14 @@ class DanbooruGUI(QtGui.QMainWindow):
         value *= self.SLIDER_MULT
         self.zoomSlider.setToolTip(self.tr("Size: %i pixels") % value)
         self.listWidget.setIconSize(QtCore.QSize(value, value))
-        generator = utils.list_generator(self.listWidget)
+        generator = list_generator(self.listWidget)
         for item in generator:
             item.setSizeHint(QtCore.QSize(value + 32, value + 32))
 
     def addItem(self, post):
         item = QtGui.QListWidgetItem()
         item.setText(post.image.md5 + post.image.file_ext)
-        item.setIcon(QtGui.QIcon().fromTheme("image-x-generic"))
+        item.setIcon(QtGui.QIcon().fromTheme('image-x-generic'))
         item.setData(QtCore.Qt.UserRole, post)
         item.setTextAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignBottom)
         value = self.zoomSlider.value() * self.SLIDER_MULT
@@ -263,10 +284,13 @@ class DanbooruGUI(QtGui.QMainWindow):
         if not text:
             return
 
-        query = utils.parse_query(text)
-        if isinstance(query, str):
-            self.statusLabel.setText(self.tr("Error in term: %s") % query)
+        result = parse_query(text)
+
+        if isinstance(result, str):
+            self.statusLabel.setText(self.tr("Error in term: %s") % result)
             return
+
+        tags, query = result
 
         if not query.get('site') and query.get('rating'):
             self.statusLabel.setText(self.tr("Search by rating depends on site"))
@@ -276,7 +300,7 @@ class DanbooruGUI(QtGui.QMainWindow):
         self.thumb.wait()
 
         self.statusLabel.setText(self.tr("Processing..."))
-        self.thumb.setData(query, self.db)
+        self.thumb.setData(tags, query, self.db)
 
         size = self.zoomSlider.value() * self.SLIDER_MULT
         self.listWidget.setIconSize(QtCore.QSize(size, size))
@@ -284,22 +308,6 @@ class DanbooruGUI(QtGui.QMainWindow):
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
-
-    locale = getlocale()
-    if locale[0]:
-        translator = QtCore.QTranslator(app)
-        try:
-            resource = utils.find_resource(__file__, "danbooru_gui-%s.qm" % locale[0])
-            if translator.load(resource):
-                app.installTranslator(translator)
-        except Exception:
-            try:
-                resource = utils.find_resource(__file__, "danbooru_gui-%s.qm" % locale[0].split("_")[0])
-                if translator.load(resource):
-                    app.installTranslator(translator)
-            except Exception:
-                pass
-
-    w = DanbooruGUI()
-    w.show()
+    load_translation('danbooru_gui', app)
+    DanbooruGUI().show()
     sys.exit(app.exec_())

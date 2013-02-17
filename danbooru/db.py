@@ -17,11 +17,12 @@
 import os
 
 from sqlalchemy import event
-from sqlalchemy.orm import scoped_session, joinedload
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm.session import sessionmaker
+from sqlalchemy.orm import scoped_session, joinedload
 from sqlalchemy.sql.expression import func, ClauseElement, distinct, not_
 
+from danbooru.utils import db_page_query
 from danbooru.models import Board, Post, Image, Tag, Base, Pool
 
 
@@ -47,6 +48,8 @@ class Storage(object):
                 bind=self.engine
             )
         )
+
+        self.board = None
 
     def _cleanDict(self, model, post):
         clean = [x.name for x in model.__mapper__.columns]
@@ -140,7 +143,8 @@ class Storage(object):
             # avoid search by post_id
             del defaults['post_id']
 
-            new_post, created = self._getOrCreate(s, Post, defaults, **{'post_id': post['post_id'], 'board': self.board})
+            new_post, created = self._getOrCreate(s, Post, defaults,
+                                                  **{'post_id': post['post_id'], 'board': self.board})
             results['posts'] += int(created)
 
             s.add(new_post)
@@ -158,7 +162,8 @@ class Storage(object):
         for pool in pools:
             clean_pool = self._cleanDict(Pool, pool)
             clean_pool.update({'modified': 1})
-            new_pool, created = self._getOrCreate(s, Pool, clean_pool, **{'pool_id': pool['pool_id'], 'board': self.board})
+            new_pool, created = self._getOrCreate(s, Pool, clean_pool, **{'pool_id': pool['pool_id'],
+                                                                          'board': self.board})
             if not created:
                 if new_pool.updated_at != pool['updated_at']:
                     new_pool.updated_at = pool['updated_at']
@@ -226,6 +231,13 @@ class Storage(object):
         q = q.order_by(Post.post_id.desc())
         return q.limit(limit).offset(offset).all()
 
+    def getPosts2(self, extra_items=None):
+        q = self.DBsession().query(Post)
+        if extra_items:
+            q = self._dict2ToQuery(q, extra_items)
+        q = q.order_by(Post.post_id.desc())
+        return db_page_query(q)
+
     def getPools(self, limit=100, offset=0, extra_items=None):
         q = self.DBsession().query(Pool).filter_by(modified=True)
         if extra_items:
@@ -233,12 +245,12 @@ class Storage(object):
         q = q.order_by(Pool.updated_at.asc())
         return q.limit(limit).offset(offset).all()
 
-    def getFiles(self, limit, offset):
+    def getImageList(self):
         q = self.DBsession().query(Post).join(Post.image)
         if self.board:
             q = q.filter(Post.board == self.board)
         q = q.options(joinedload('image'))
-        return q.limit(limit).offset(offset).all()
+        return db_page_query(q)
 
     def deletePostsByTags(self, blacklist, whitelist):
         if not blacklist:
@@ -265,4 +277,4 @@ class Storage(object):
         tag_count = d.delete(synchronize_session='fetch')
 
         s.commit()
-        return (post_count, img_count, tag_count)
+        return post_count, img_count, tag_count

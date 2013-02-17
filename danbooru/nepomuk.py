@@ -41,9 +41,9 @@ class NepomukTask(object):
         QtCore.QTimer.singleShot(0, self.job.updateDir)
         return self.app.exec_()
 
-    def updateFileTags(self, file, db):
+    def updateFileTags(self, file, db, stop_event=None):
         self._initNepomuk()
-        self.job = NepomukJob()
+        self.job = NepomukJob(stop_event)
         self.job.setFileData(file, db)
         QtCore.QTimer.singleShot(1000, self.job.updateFile)
         return self.app.exec_()
@@ -51,11 +51,10 @@ class NepomukTask(object):
 
 class NepomukJob(QtCore.QObject):
 
-    file_count = 1
-    _stop = False
-
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, stop_event):
         super().__init__(parent)
+        self.event = stop_event
+        self.file_count = 1
 
     def setDirData(self, path, db):
         self.start_path = path
@@ -65,13 +64,10 @@ class NepomukJob(QtCore.QObject):
         self.file_path = path
         self.db = db
 
-    def cancelJob(self):
-        self._stop = True
-
     def updateDirTags(self, directory):
         loop = QtCore.QEventLoop()
         for name in os.listdir(directory):
-            if self._stop:
+            if self.event.is_set():
                 break
             full_path = os.path.join(directory, name)
             if os.path.isdir(full_path):
@@ -98,7 +94,7 @@ class NepomukJob(QtCore.QObject):
         for ontology in ontologies:
             res.removeProperty(KUrl(self.ndbu_uri % ontology))
 
-    def setProperty(self, res, ontology, prop):
+    def setNepomukProperty(self, res, ontology, prop):
         res.setProperty(KUrl(self.ndbu_uri % ontology), Nepomuk.Variant(prop))
 
     def getResource(self, res):
