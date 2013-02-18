@@ -15,6 +15,7 @@
 #   limitations under the License.
 
 import os
+import urllib
 import logging
 import requests
 from danbooru.utils import md5sum
@@ -64,4 +65,8 @@ class Downloader(object):
             subdir = row.image.md5[0]
             filename = os.path.join(self.path, subdir, base_name)
             if not self.valid_image(row, filename, check_md5sum):
-                self.download_file(row.file_url, filename, callback=callback)
+                if row.file_url.startswith('http'):
+                    url = row.file_url
+                else:
+                    url = urllib.parse.urljoin(row.board.host, row.file_url)
+                self.download_file(url, filename, callback=callback)
